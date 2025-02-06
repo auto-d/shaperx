@@ -1,0 +1,5 @@
+.DS_Store
+.ipynb_checkpoints/
+medshapenetcore_npz/
+mystery_data/
+venv/
