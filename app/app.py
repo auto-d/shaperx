@@ -73,6 +73,10 @@ def generate_images(size_pixels, angle_increment):
                                            w=size_pixels, 
                                            png=path)
                         
+                        # TODO: need to stick all these image paths in a dataframe with labels
+                        # to allow us to kick off a training run from the UI w/ hyperparameter
+                        #  widgets
+                         
                         if len(examples) < 20: 
                             examples.append(path)
             break 
@@ -82,6 +86,18 @@ def generate_images(size_pixels, angle_increment):
             pass
 
     return examples
+
+def split_data(): 
+    pass
+
+def train_model(): 
+    pass
+
+def test_model(): 
+    pass
+
+def batch_train(): 
+    pass
 
 demo = gr.Blocks()
 with demo: 
