@@ -8,7 +8,7 @@ import dataset
 data_dir = 'data'
 metadata = None
 mesh_samples = None
-
+images = None
 # TODO: comments... 
 
 def download_dataset(filename): 
@@ -46,7 +46,16 @@ def show_mesh(mesh):
     # https://www.gradio.app/guides/how-to-use-3D-model-component
     pass
 
+def compute_image_count(angle_increment): 
+    
+    if mesh_samples: 
+        viewpoints_per_axis = 360/angle_increment    
+        return mesh_samples.shape[0] * viewpoints_per_axis**3
+
 def generate_images(size_pixels, angle_increment):
+    
+    imagesf = pd.DataFrame(columns=['source', 'file', 'label'])
+    insert_at = 0
     examples = []
 
     for row in mesh_samples.itertuples(): 
@@ -72,10 +81,8 @@ def generate_images(size_pixels, angle_increment):
                                            h=size_pixels, 
                                            w=size_pixels, 
                                            png=path)
-                        
-                        # TODO: need to stick all these image paths in a dataframe with labels
-                        # to allow us to kick off a training run from the UI w/ hyperparameter
-                        #  widgets
+                        images.loc[insert_at] = { 'source': file, 'file' : path, 'label': label}
+                        insert_at += 1
                          
                         if len(examples) < 20: 
                             examples.append(path)
@@ -131,7 +138,7 @@ with demo:
     # Mesh Sampling    
     gr.Markdown(value="## Conduct stratified sampling")
     with gr.Row():
-        mesh_sample_slider = gr.Slider(label="Sample count")
+        mesh_sample_slider = gr.Slider(label="Sample count", value=5)
         mesh_sample_button = gr.Button("Sample")        
     mesh_sample_output = gr.Dataframe()
     mesh_sample_button.click(fn=sample_metadata, inputs=mesh_sample_slider, outputs=mesh_sample_output)
@@ -142,13 +149,17 @@ with demo:
     gr.Markdown(value="Permute the various facets of the rendering and generate an image set")    
     
     with gr.Row(): 
-        image_size = gr.Slider(label="Image size (pixels)")
-        image_angle = gr.Slider(label="Angle increments (degrees)")
+        image_size = gr.Slider(label="Image size (pixels)", value=50)
+        image_angle = gr.Slider(label="Angle increments (degrees)", value=45)
+    with gr.Row(): 
+        image_count_text = gr.Markdown(value="Images to generate:")
+        image_count = gr.Markdown(value=compute_image_count(45))
+    image_count.change(fn=compute_image_count, inputs=image_angle, outputs=image_count)
     image_generate_button = gr.Button("Generate images")
     image_gallery = gr.Gallery()
     
     # TODO: instead of outputting nothing, output a bar of generated sample images
-    image_generate_button.click(fn=generate_images, inputs=[image_size, image_angle], outputs=i)
+    image_generate_button.click(fn=generate_images, inputs=[image_size, image_angle], outputs=image_gallery)
     
 
 demo.launch(share=False)
