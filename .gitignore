@@ -3,3 +3,7 @@
 medshapenetcore_npz/
 mystery_data/
 venv/
+.vscode/
+data/*.stl
+data/*.stl.1
+app/__pycache__
