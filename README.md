@@ -6,13 +6,19 @@ Theme: Healt, wellness and fitness
 
 ## Design
 
-1. Naive approach 
-2. Non-deep learning approach 
+1. Naive approach : B&w histograms? 
+2. Non-deep learning approach : ?
 3. NN-based approach : PyTorch-based convolutional neural network 
 
 ## Development
 
-TODO 
+For dependencies, see [requirements](requirements.txt). 
+
+If working on the UI, run in gradio development mode: 
+
+`gradio app/app.py`
+
+⚡ The app expects to be run from the root of the repo, not the app directory. Mostly because we have the 'data' directory hardcoded.
 
 ## Testing 
 
