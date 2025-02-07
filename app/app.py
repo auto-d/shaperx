@@ -7,17 +7,23 @@ import dataset
 
 data_dir = 'data'
 metadata = None
+mesh_samples = None
+
+# TODO: comments... 
 
 def download_dataset(filename): 
     if not os.path.exists(data_dir): 
         os.makesirs(data_dir) 
 
     subprocess.run(
-        ["wget", "--content-disposition"," --trust-server-names","-i",filename], 
+        ["wget", "--content-disposition"," --trust-server-names", "--no-clobber","-i",filename], 
         cwd=data_dir,
         )
     
     return "Done!"
+
+def retrieve_sample_mesh(file): 
+    return file
 
 def load_metadata(): 
     global metadata
@@ -29,34 +35,93 @@ def load_metadata():
 
 def sample_metadata(n): 
     global metadata
-    samples = dataset.sample_meshes(metadata, n)
-    groups = samples.groupby(by='label')
+    global mesh_samples
+    mesh_samples = dataset.sample_meshes(metadata, n)
+    groups = mesh_samples.groupby(by='label')
     counts = groups.count().reset_index()
     counts.columns = ['label', 'count']
     return counts
 
+def show_mesh(mesh):
+    # https://www.gradio.app/guides/how-to-use-3D-model-component
+    pass
+
+def generate_images(size_pixels, angle_increment):
+    for row in mesh_samples.itertuples(): 
+        id = row[0]
+        file = row[1]
+        label = row[2]
+        
+        sample = dataset.load_mesh(file)
+        if len(sample.vertices) > 0: 
+            X = range(0, 360, angle_increment)
+            Y = range(0, 360, angle_increment)
+            Z = range(0, 360, angle_increment)
+            for x in X: 
+                for y in Y: 
+                    for z in Z: 
+                        rotated = dataset.rotate_mesh(sample, x, y, z)
+                        
+                        # TODO: save these generated images in their own experiment folder so we can be screwing 
+                        # aroudn with this while model training is happening
+                        dataset.save_image(mesh=rotated, 
+                                           h=size_pixels, 
+                                           w=size_pixels, 
+                                           png=os.path.join(data_dir,f"{id}-{label}-{x}-{y}-{z}.png"))
+            break 
+        else: 
+            # TODO: unclear why we can't load some of these STL files, but some appear to be missing some opening 
+            # tags... perhaps a download problem. consider implementing some handling or investigating further
+            pass
+
+
 demo = gr.Blocks()
 with demo: 
 
-    file_input = gr.FileExplorer()
-        
     # Load
+    gr.Markdown(value="# Load")
+    gr.Markdown(value="Update or retrieve new stereo lithography (STL) files.")
+
     manifest_input = gr.Textbox(label="Dataset manifest:", value="MedShapeNetDataset_vertebrae_labeled.txt")
     with gr.Row(): 
         manifest_button = gr.Button("Download")
         manifest_output = gr.Markdown()
     manifest_button.click(fn=download_dataset, inputs=manifest_input, outputs=manifest_output)
 
-    # Extract
+    # View Sample
+    gr.Markdown(value="Review downloaded models")
+    with gr.Row(): 
+        sample_mesh_input = gr.FileExplorer(file_count='single', root_dir=data_dir, max_height=240)
+        sample_mesh_output = gr.Model3D(clear_color=[0.0, 0.0, 0.0, 0.0], label='Selected sample')
+    sample_mesh_button = gr.Button("Render sample")
+    sample_mesh_button.click(fn=retrieve_sample_mesh, inputs=sample_mesh_input, outputs=sample_mesh_output)
+
+    # Process
+    gr.Markdown(value="# Process")
+    gr.Markdown(value="Process downloaded 3d models")
     metadata_button = gr.Button("Extract metadata")
     metadata_output = gr.Dataframe(max_height=200)
     metadata_button.click(fn=load_metadata, inputs=None, outputs=metadata_output)
 
     # Mesh Sampling    
+    gr.Markdown(value="Conduct stratified sampling")
     with gr.Row():
         mesh_sample_button = gr.Button("Sample")
         mesh_sample_slider = gr.Slider(label="Sample count")
     mesh_sample_output = gr.Dataframe()
     mesh_sample_button.click(fn=sample_metadata, inputs=mesh_sample_slider, outputs=mesh_sample_output)
+
+    # Image Generation
+    gr.Markdown(value="# Image generation")
+    gr.Markdown(value="Permute the various facets of the rendering and generate an image set")    
+    
+    with gr.Row(): 
+        image_size = gr.Slider(label="Image size (pixels)")
+        image_angle_increments = gr.Slider(label="Angle increments")
+    image_generate_button = gr.Button("Generate images")
+    
+    # TODO: instead of outputting nothing, output a bar of generated sample images
+    image_generate_button.click(fn=generate_images, inputs=image_angle_increments, outputs=None)
+    
 
 demo.launch(share=False)
