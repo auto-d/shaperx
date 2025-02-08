@@ -6,6 +6,7 @@ import re
 import dataset
 
 data_dir = 'data'
+experiment_dir = 'experiments'
 metadata = None
 mesh_samples = None
 images = None
@@ -36,25 +37,26 @@ def load_metadata():
 def sample_metadata(n): 
     global metadata
     global mesh_samples
-    mesh_samples = dataset.sample_meshes(metadata, n)
-    groups = mesh_samples.groupby(by='label')
-    counts = groups.count().reset_index()
-    counts.columns = ['label', 'count']
-    return counts
+    
+    if isinstance(metadata, pd.DataFrame):
+        mesh_samples = dataset.sample_meshes(metadata, n)
+        groups = mesh_samples.groupby(by='label')
+        counts = groups.count().reset_index()
+        counts.columns = ['label', 'count']
+        return counts
 
 def show_mesh(mesh):
     # https://www.gradio.app/guides/how-to-use-3D-model-component
     pass
 
-def compute_image_count(angle_increment): 
-    
-    if mesh_samples: 
+def compute_image_count(angle_increment):  
+    if isinstance(mesh_samples, pd.DataFrame):
         viewpoints_per_axis = 360/angle_increment    
-        return mesh_samples.shape[0] * viewpoints_per_axis**3
+        return f"{int(mesh_samples.shape[0] * viewpoints_per_axis**3)}"
 
 def generate_images(size_pixels, angle_increment):
     
-    imagesf = pd.DataFrame(columns=['source', 'file', 'label'])
+    images = pd.DataFrame(columns=['source', 'file', 'label'])
     insert_at = 0
     examples = []
 
@@ -71,11 +73,8 @@ def generate_images(size_pixels, angle_increment):
             for x in X: 
                 for y in Y: 
                     for z in Z: 
-                        rotated = dataset.rotate_mesh(sample, x, y, z)
-                        
-                        # TODO: save these generated images in their own experiment folder so we can be screwing 
-                        # around with this while model training is happening
-                        path = os.path.join(data_dir,f"{id}-{label}-{size_pixels}-{x}-{y}-{z}.png")
+                        rotated = dataset.rotate_mesh(sample, x, y, z)                        
+                        path = os.path.join(experiment_dir,f"{id}-{label}-{size_pixels}-{x}-{y}-{z}.png")
 
                         dataset.save_image(mesh=rotated, 
                                            h=size_pixels, 
@@ -86,11 +85,8 @@ def generate_images(size_pixels, angle_increment):
                          
                         if len(examples) < 20: 
                             examples.append(path)
-            break 
         else: 
-            # TODO: unclear why we can't load some of these STL files, but some appear to be missing some opening 
-            # tags... perhaps a download problem. consider implementing some handling or investigating further
-            pass
+            print(f"Error: unable to load vertices for model {file}. Moving to next file.")
 
     return examples
 
@@ -138,7 +134,7 @@ with demo:
     # Mesh Sampling    
     gr.Markdown(value="## Conduct stratified sampling")
     with gr.Row():
-        mesh_sample_slider = gr.Slider(label="Sample count", value=5)
+        mesh_sample_slider = gr.Slider(label="Sample count", value=5, maximum=25)
         mesh_sample_button = gr.Button("Sample")        
     mesh_sample_output = gr.Dataframe()
     mesh_sample_button.click(fn=sample_metadata, inputs=mesh_sample_slider, outputs=mesh_sample_output)
@@ -149,16 +145,15 @@ with demo:
     gr.Markdown(value="Permute the various facets of the rendering and generate an image set")    
     
     with gr.Row(): 
-        image_size = gr.Slider(label="Image size (pixels)", value=50)
-        image_angle = gr.Slider(label="Angle increments (degrees)", value=45)
+        image_size = gr.Slider(label="Image size (pixels)", value=64, minimum=32, maximum=256, step=32)
+        image_angle = gr.Slider(label="Angle increments (degrees)", value=45, minimum=2, maximum=180, step=15)
     with gr.Row(): 
         image_count_text = gr.Markdown(value="Images to generate:")
-        image_count = gr.Markdown(value=compute_image_count(45))
-    image_count.change(fn=compute_image_count, inputs=image_angle, outputs=image_count)
+        image_count = gr.Markdown(value="*Extract metadata and sample to see estimate*")
+    image_angle.release(fn=compute_image_count, inputs=[image_angle], outputs=image_count)
     image_generate_button = gr.Button("Generate images")
     image_gallery = gr.Gallery()
-    
-    # TODO: instead of outputting nothing, output a bar of generated sample images
+
     image_generate_button.click(fn=generate_images, inputs=[image_size, image_angle], outputs=image_gallery)
     
 
