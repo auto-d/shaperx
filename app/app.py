@@ -106,6 +106,10 @@ demo = gr.Blocks()
 with demo: 
 
     # Load
+    
+    # This works, and can be used but is here to illustrate the process for the demo
+    # or simplify download, not both. :)  I.e. we shouldn't be downloading the dataset
+    # during the demo (takes forever) 
     gr.Markdown(value="# 📦 Load")
     gr.Markdown(value="## Update or retrieve new stereo lithography (STL) files.")
 
@@ -134,19 +138,23 @@ with demo:
     # Mesh Sampling    
     gr.Markdown(value="## Conduct stratified sampling")
     with gr.Row():
-        mesh_sample_slider = gr.Slider(label="Sample count", value=5, maximum=25)
+        mesh_sample_slider = gr.Slider(label="Sample count", value=5, maximum=25, step=1)
         mesh_sample_button = gr.Button("Sample")        
     mesh_sample_output = gr.Dataframe()
     mesh_sample_button.click(fn=sample_metadata, inputs=mesh_sample_slider, outputs=mesh_sample_output)
 
     # Image Generation
+     
+    # As above with loading, this is great for experimentation, but shouldn't be run 
+    # during the demo with anything but trivial values since it will take hours to 
+    # generate and can safely be skipped. 
     gr.Markdown()
     gr.Markdown(value="# 🪄 Generate")
     gr.Markdown(value="Permute the various facets of the rendering and generate an image set")    
     
     with gr.Row(): 
         image_size = gr.Slider(label="Image size (pixels)", value=64, minimum=32, maximum=256, step=32)
-        image_angle = gr.Slider(label="Angle increments (degrees)", value=45, minimum=2, maximum=180, step=15)
+        image_angle = gr.Slider(label="Angle increments (degrees)", value=45, minimum=0, maximum=360, step=15)
     with gr.Row(): 
         image_count_text = gr.Markdown(value="Images to generate:")
         image_count = gr.Markdown(value="*Extract metadata and sample to see estimate*")
@@ -156,5 +164,10 @@ with demo:
 
     image_generate_button.click(fn=generate_images, inputs=[image_size, image_angle], outputs=image_gallery)
     
+    # Model Training 
+    # TODO: 
 
-demo.launch(share=False)
+    # Model Testing
+    # TODO: 
+
+demo.launch(share=True)
