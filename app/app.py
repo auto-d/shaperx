@@ -5,14 +5,35 @@ import pandas as pd
 import re 
 import dataset
 
+## Disclaimer: the use of globals here is mildly annoying, but passing all 
+## this state around in gradio isn't super elegant, so we opt to suffer these
+
+# Import/export location for 3d models
 data_dir = 'data'
+
+# Generate/retrieve experiment runs into this folder
 experiments_dir = 'experiments'
+
+# Metadata about all the 3d models we know about
 metadata = None
-mesh_samples = None
-images = None
-# TODO: comments... 
+
+# Metadata about the *sampled* models for each split
+mesh_trn = None
+mesh_tst = None
+mesh_val = None
+
+# Metadata about the images we generate for each split
+images_trn = None
+images_tst = None
+images_val = None 
+
+# Count of classes in the dataset
+classes = len(dataset.class_map)
 
 def download_dataset(filename): 
+    """
+    Retrieve the datasets based on a manifest of URLs
+    """
     if not os.path.exists(data_dir): 
         os.makedirs(data_dir) 
 
@@ -24,9 +45,16 @@ def download_dataset(filename):
     return "Done!"
 
 def retrieve_sample_mesh(file): 
+    """
+    Retrieve a sample mesh
+    """
+    # No processing required, our inputs = outputs for the UI widgets
     return file
 
 def load_metadata(): 
+    """
+    Scan the data directory for all available 3d mesh sources (of vertebrae)
+    """
     global metadata
     metadata = dataset.load_mesh_metadata(data_dir)
     groups = metadata.groupby(by='label')
@@ -34,36 +62,68 @@ def load_metadata():
     df.columns = ['labels', 'count']
     return df
 
-def sample_metadata(n): 
+def sample_metadata(trn_n, tst_n, val_n): 
+    """
+    For each split, sample the provided number of rows for each class and 
+    return as three separate dataframes for the user to validate the operation
+    """
     global metadata
-    global mesh_samples
+    global mesh_trn
+    global mesh_tst
+    global mesh_val
     
     if isinstance(metadata, pd.DataFrame):
-        mesh_samples = dataset.sample_meshes(metadata, n)
-        groups = mesh_samples.groupby(by='label')
-        counts = groups.count().reset_index()
-        counts.columns = ['label', 'count']
-        return counts
+        mesh_trn, mesh_tst, mesh_val = dataset.split_meshes(
+            metadata, 
+            trn_n, 
+            tst_n, 
+            val_n,
+        )
 
-def show_mesh(mesh):
-    # https://www.gradio.app/guides/how-to-use-3D-model-component
-    pass
+        groups = mesh_trn.groupby(by='label')
+        counts_trn = groups.count().reset_index()
+        counts_trn.columns = ['label', 'count']
+        
+        groups = mesh_tst.groupby(by='label')
+        counts_tst = groups.count().reset_index()
+        counts_tst.columns = ['label', 'count']
+
+        groups = mesh_val.groupby(by='label')
+        counts_val = groups.count().reset_index()
+        counts_val.columns = ['label', 'count']
+        
+        return counts_trn, counts_tst, counts_val
 
 def compute_image_count(angle_increment):  
-    if isinstance(mesh_samples, pd.DataFrame):
+    """
+    Estimate the number of images that will be generated for the given angle
+    """
+    if isinstance(mesh_trn, pd.DataFrame):
         viewpoints_per_axis = 360/angle_increment    
-        return f"{int(mesh_samples.shape[0] * viewpoints_per_axis**3)}"
+        count = \
+            mesh_trn.shape[0] * viewpoints_per_axis**3 \
+            + mesh_tst.shape[0] * viewpoints_per_axis**3 \
+            + mesh_val.shape[0]* viewpoints_per_axis**3 
+        return f"{int(count)}"
 
-def generate_images(size_pixels, angle_increment):
+def generate_split_images(samples, dir, size_pixels, angle_increment): 
+    """
+    Generate an image set for one of our splits
+    """
+
+    # new implementation of load, rotate and save goes in here, in lieu of
+    # below. BUT, make sure the new implementation returns a dataframe with 
+    # the generated file and associated label for follow on model training
     
-    if not os.path.exists(experiments_dir): 
-        os.makedirs(experiments_dir) 
+    if not os.path.exists(dir): 
+        os.makedirs(dir) 
 
     images = pd.DataFrame(columns=['source', 'file', 'label'])
     insert_at = 0
     examples = []
 
-    for row in mesh_samples.itertuples(): 
+    # Iterate over the samples we selected from the dataset
+    for row in samples.itertuples(): 
         id = row[0]
         file = row[1]
         label = row[2]
@@ -79,7 +139,7 @@ def generate_images(size_pixels, angle_increment):
                         rotated = dataset.rotate_mesh(sample, x, y, z)                        
                         path = os.path.join(experiments_dir,f"{id}-{label}-{size_pixels}-{x}-{y}-{z}.png")
 
-                        dataset.save_image(mesh=rotated, 
+                        dataset.save_image_mask(mesh=rotated, 
                                            h=size_pixels, 
                                            w=size_pixels, 
                                            png=path)
@@ -91,10 +151,25 @@ def generate_images(size_pixels, angle_increment):
         else: 
             print(f"Error: unable to load vertices for model {file}. Moving to next file.")
 
-    return examples
+    return images, examples
 
-def split_data(): 
-    pass
+def generate_images(size_pixels, angle_increment):
+    """
+    Use our 3d models to permute and emit images for each split
+    """
+    global images_trn 
+    global images_tst
+    global images_val 
+
+    if not os.path.exists(experiments_dir): 
+        os.makedirs(experiments_dir) 
+
+    images_trn, examples = generate_split_images(mesh_trn, experiments_dir, size_pixels, angle_increment)
+    images_tst, _ = generate_split_images(mesh_tst, experiments_dir, size_pixels, angle_increment)
+    images_val, _ = generate_split_images(mesh_val, experiments_dir, size_pixels, angle_increment)
+
+    # Provide examples of the training set for the user to visually inspect
+    return examples
 
 def train_model(): 
     pass
@@ -139,12 +214,29 @@ with demo:
     metadata_button.click(fn=load_metadata, inputs=None, outputs=metadata_output)
 
     # Mesh Sampling    
-    gr.Markdown(value="## Conduct stratified sampling")
+    gr.Markdown(value="## Select sources for model pipeline")
+    gr.Markdown(value=f"We'll sample for class (we have {classes} classes)")
     with gr.Row():
-        mesh_sample_slider = gr.Slider(label="Sample count", value=5, maximum=25, step=1)
-        mesh_sample_button = gr.Button("Sample")        
-    mesh_sample_output = gr.Dataframe()
-    mesh_sample_button.click(fn=sample_metadata, inputs=mesh_sample_slider, outputs=mesh_sample_output)
+        mesh_trn_slider = gr.Slider(label="Training sources", value=5, maximum=20, step=1)
+        mesh_tst_slider = gr.Slider(label="Test sources", value=1, maximum=20, step=1)
+        mesh_val_slider = gr.Slider(label="Validation sources", value=1, maximum=20, step=1)
+    mesh_sample_button = gr.Button("Sample")
+    with gr.Row(): 
+        mesh_trn_output = gr.Dataframe(label="Training sources selected")
+        mesh_tst_output = gr.Dataframe(label="Training sources selected")
+        mesh_val_output = gr.Dataframe(label="Training sources selected")
+    mesh_sample_button.click(
+        fn=sample_metadata, 
+        inputs=[
+            mesh_trn_slider, 
+            mesh_tst_slider, 
+            mesh_val_slider,
+        ],
+        outputs=[
+            mesh_trn_output,
+            mesh_tst_output,
+            mesh_val_output,
+        ])
 
     # Image Generation
      
@@ -163,6 +255,7 @@ with demo:
         image_count = gr.Markdown(value="*Extract metadata and sample to see estimate*")
     image_angle.release(fn=compute_image_count, inputs=[image_angle], outputs=image_count)
     image_generate_button = gr.Button("Generate images")
+    image_gallery_label = gr.Markdown(value="Training set examples:")
     image_gallery = gr.Gallery()
 
     image_generate_button.click(fn=generate_images, inputs=[image_size, image_angle], outputs=image_gallery)
