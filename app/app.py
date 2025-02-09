@@ -6,7 +6,7 @@ import re
 import dataset
 
 data_dir = 'data'
-experiment_dir = 'experiments'
+experiments_dir = 'experiments'
 metadata = None
 mesh_samples = None
 images = None
@@ -14,7 +14,7 @@ images = None
 
 def download_dataset(filename): 
     if not os.path.exists(data_dir): 
-        os.makesirs(data_dir) 
+        os.makedirs(data_dir) 
 
     subprocess.run(
         ["wget", "--content-disposition"," --trust-server-names", "--no-clobber","-i",filename], 
@@ -56,6 +56,9 @@ def compute_image_count(angle_increment):
 
 def generate_images(size_pixels, angle_increment):
     
+    if not os.path.exists(experiments_dir): 
+        os.makedirs(experiments_dir) 
+
     images = pd.DataFrame(columns=['source', 'file', 'label'])
     insert_at = 0
     examples = []
@@ -74,7 +77,7 @@ def generate_images(size_pixels, angle_increment):
                 for y in Y: 
                     for z in Z: 
                         rotated = dataset.rotate_mesh(sample, x, y, z)                        
-                        path = os.path.join(experiment_dir,f"{id}-{label}-{size_pixels}-{x}-{y}-{z}.png")
+                        path = os.path.join(experiments_dir,f"{id}-{label}-{size_pixels}-{x}-{y}-{z}.png")
 
                         dataset.save_image(mesh=rotated, 
                                            h=size_pixels, 
@@ -170,4 +173,4 @@ with demo:
     # Model Testing
     # TODO: 
 
-demo.launch(share=True)
+demo.launch(share=False)
