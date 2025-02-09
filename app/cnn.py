@@ -1,4 +1,6 @@
+#
 # Adapated from PyTorch image classifier tutorial - https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
+#
 
 from dataset import class_map
 
@@ -70,8 +72,6 @@ class ShapeRxDataset(torch.utils.data.Dataset):
     """
     def __init__(self, annotations_file, img_dir, transform=None, target_transform=None): 
 
-        # This is just a hair off the df we emit from generate_images, see above for minor transformation 
-        # to achieve alignement w/ torch expectations (columns = file, label)
         self.img_labels = pd.read_csv(annotations_file)
 
         self.img_dir = img_dir
@@ -111,12 +111,12 @@ def get_data_loader(annotations_file, img_dir, batch_size=5):
     
     return loader
 
-def train(loader, cnn, iterations=2):
+def train(loader, net, iterations=2):
     """
     Train the model with the provided dataset
     """
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(cnn.parameters(), lr=0.001, momentum=0.9)
+    optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
     for epoch in range(iterations):  # loop over the dataset multiple times
 
@@ -130,14 +130,14 @@ def train(loader, cnn, iterations=2):
             optimizer.zero_grad()
 
             # forward + backward + optimize
-            outputs = cnn(inputs)
+            outputs = net(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
 
             # print statistics
             running_loss += loss.item()
-            if i % 20 == 19:    # print every 2000 mini-batches
+            if i % 20 == 19:  
                 print(f"[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}")
                 running_loss = 0.0
     

@@ -44,3 +44,5 @@ The Gradio app allows the user to walk through the model pipeline, from download
 - ❗ a number of files are not loading into the mesh, warning printed is shown below. for now we are ignoring, but we should process the whole dataset to remove these and then resample, otherwise we'll have unintended class imbalance
   > [Open3D WARNING] Unable to load file data/001200_vertebrae.stl with ASSIMP: Unable to open file "data/001200_vertebrae.stl".
 - ❗ we aren't inducing any scale change in our images, remedy that!
+- ❗ the export directories are inconsistently used, the images are generated into the experiments/ folder (not the subfolders) and the annotations.csv is generate dinthe subfolder but it's being looked for in the experiments folder... fix
+-  -

@@ -145,13 +145,13 @@ def generate_split_images(samples, dir, size_pixels, angle_increment):
                     for z in Z: 
                         rotated = dataset.rotate_mesh(sample, x, y, z)                        
                         image_file = f"{id}-{label}-{size_pixels}-{x}-{y}-{z}.png"
-                        path = os.path.join(experiments_dir,image_file)
+                        path = os.path.join(dir,image_file)
 
                         dataset.save_image_mask(mesh=rotated, 
                                            h=size_pixels, 
                                            w=size_pixels, 
                                            png=path)
-                        images.loc[insert_at] = { 'source': file, 'file' : image_file, 'label': label}
+                        images.loc[insert_at] = { 'source': file, 'file' : image_file, 'label': dataset.get_class_index(label)}
                         insert_at += 1
                          
                         if len(examples) < 20: 
@@ -161,14 +161,18 @@ def generate_split_images(samples, dir, size_pixels, angle_increment):
 
     return images, examples
 
+def get_experiment_dir(): 
+    # TODO: silly to hardcode this - fix 
+    return os.path.join(experiments_dir,'6')
+
 def get_trn_csv(): 
-    return os.path.join(experiments_dir,'train.csv')
+    return os.path.join(get_experiment_dir(),'train.csv')
 
 def get_tst_csv(): 
-    return os.path.join(experiments_dir,'test.csv')
+    return os.path.join(get_experiment_dir(),'test.csv')
 
 def get_val_csv(): 
-    return os.path.join(experiments_dir,'val.csv')
+    return os.path.join(get_experiment_dir(),'val.csv')
 
 def generate_images(size_pixels, angle_increment):
     """
@@ -178,13 +182,14 @@ def generate_images(size_pixels, angle_increment):
     global images_tst
     global images_val 
 
-    if not os.path.exists(experiments_dir): 
+    dir = get_experiment_dir()
+    if not os.path.exists(dir): 
         os.makedirs(experiments_dir) 
 
     # Generate imagesets for each split
-    images_trn, examples = generate_split_images(mesh_trn, experiments_dir, size_pixels, angle_increment)
-    images_tst, _ = generate_split_images(mesh_tst, experiments_dir, size_pixels, angle_increment)
-    images_val, _ = generate_split_images(mesh_val, experiments_dir, size_pixels, angle_increment)
+    images_trn, examples = generate_split_images(mesh_trn, dir, size_pixels, angle_increment)
+    images_tst, _ = generate_split_images(mesh_tst, dir, size_pixels, angle_increment)
+    images_val, _ = generate_split_images(mesh_val, dir, size_pixels, angle_increment)
 
     # Our dataframe has some extra information that needs to be ejected before we 
     # create the pytorch-esqe annotations file. This memorializes the splits and permits us to 
@@ -203,9 +208,14 @@ def train_model():
     Train a vanilla CNN to classify using the training set
     """
     global net 
+    
+    # Create the CNN
     net = cnn.Net() 
 
-    loader = cnn.get_data_loader(get_trn_csv(), 'experiments/5', batch_size=2) 
+    # Instantiate the pytorch loader with our custom DataSet
+    loader = cnn.get_data_loader(get_trn_csv(), get_experiment_dir(), batch_size=2) 
+    
+    # Train 
     result = cnn.train(loader, net)
 
     return result
