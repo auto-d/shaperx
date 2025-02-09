@@ -4,6 +4,10 @@ import os
 import pandas as pd
 import re 
 import dataset
+import torch
+import torchvision 
+import torchvision.transforms as transforms
+import cnn 
 
 ## Disclaimer: the use of globals here is mildly annoying, but passing all 
 ## this state around in gradio isn't super elegant, so we opt to suffer these
@@ -29,6 +33,9 @@ images_val = None
 
 # Count of classes in the dataset
 classes = len(dataset.class_map)
+
+# Our CNN
+net = None
 
 def download_dataset(filename): 
     """
@@ -137,13 +144,14 @@ def generate_split_images(samples, dir, size_pixels, angle_increment):
                 for y in Y: 
                     for z in Z: 
                         rotated = dataset.rotate_mesh(sample, x, y, z)                        
-                        path = os.path.join(experiments_dir,f"{id}-{label}-{size_pixels}-{x}-{y}-{z}.png")
+                        image_file = f"{id}-{label}-{size_pixels}-{x}-{y}-{z}.png"
+                        path = os.path.join(experiments_dir,image_file)
 
                         dataset.save_image_mask(mesh=rotated, 
                                            h=size_pixels, 
                                            w=size_pixels, 
                                            png=path)
-                        images.loc[insert_at] = { 'source': file, 'file' : path, 'label': label}
+                        images.loc[insert_at] = { 'source': file, 'file' : image_file, 'label': label}
                         insert_at += 1
                          
                         if len(examples) < 20: 
@@ -152,6 +160,15 @@ def generate_split_images(samples, dir, size_pixels, angle_increment):
             print(f"Error: unable to load vertices for model {file}. Moving to next file.")
 
     return images, examples
+
+def get_trn_csv(): 
+    return os.path.join(experiments_dir,'train.csv')
+
+def get_tst_csv(): 
+    return os.path.join(experiments_dir,'test.csv')
+
+def get_val_csv(): 
+    return os.path.join(experiments_dir,'val.csv')
 
 def generate_images(size_pixels, angle_increment):
     """
@@ -164,20 +181,44 @@ def generate_images(size_pixels, angle_increment):
     if not os.path.exists(experiments_dir): 
         os.makedirs(experiments_dir) 
 
+    # Generate imagesets for each split
     images_trn, examples = generate_split_images(mesh_trn, experiments_dir, size_pixels, angle_increment)
     images_tst, _ = generate_split_images(mesh_tst, experiments_dir, size_pixels, angle_increment)
     images_val, _ = generate_split_images(mesh_val, experiments_dir, size_pixels, angle_increment)
 
-    # Provide examples of the training set for the user to visually inspect
+    # Our dataframe has some extra information that needs to be ejected before we 
+    # create the pytorch-esqe annotations file. This memorializes the splits and permits us to 
+    # pick up later with these labelsets.
+    annotations = images_trn.drop(labels='source', axis='columns')
+    annotations.to_csv(get_trn_csv(), index=False)
+    annotations = images_tst.drop(labels='source', axis='columns')
+    annotations.to_csv(get_tst_csv(), index=False)
+    annotations = images_val.drop(labels='source', axis='columns')
+    annotations.to_csv(get_val_csv(), index=False)
+
     return examples
 
 def train_model(): 
-    pass
+    """
+    Train a vanilla CNN to classify using the training set
+    """
+    global net 
+    net = cnn.Net() 
+
+    loader = cnn.get_data_loader(get_trn_csv(), 'experiments/5', batch_size=2) 
+    result = cnn.train(loader, net)
+
+    return result
+
+def classify(image): 
+    global net
+    
+    # TODO: we need to pass the class label back here, not the logits
+    prediction = net(image)
+    
+    return prediction
 
 def test_model(): 
-    pass
-
-def batch_train(): 
     pass
 
 demo = gr.Blocks()
@@ -243,7 +284,6 @@ with demo:
     # As above with loading, this is great for experimentation, but shouldn't be run 
     # during the demo with anything but trivial values since it will take hours to 
     # generate and can safely be skipped. 
-    gr.Markdown()
     gr.Markdown(value="# 🪄 Generate")
     gr.Markdown(value="Permute the various facets of the rendering and generate an image set")    
     
@@ -261,7 +301,14 @@ with demo:
     image_generate_button.click(fn=generate_images, inputs=[image_size, image_angle], outputs=image_gallery)
     
     # Model Training 
-    # TODO: 
+    gr.Markdown(value="# ⚙️ Train")
+    train_button = gr.Button("Train CNN")
+    with gr.Row(): 
+        gr.Markdown(value="Training result:")
+        train_result = gr.Markdown()
+
+    #TODO: adjust hyperparameters from the UI?
+    train_button.click(fn=train_model, inputs=None, outputs=train_result)
 
     # Model Testing
     # TODO: 
