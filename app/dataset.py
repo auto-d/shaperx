@@ -9,7 +9,7 @@ from open3d.visualization import rendering
 # TODO: comments... 
 
 def decode_label(filename:str) -> str:
-    match = re.search(".*vertebrae_?([A-Z][0-9]).*.stl", filename)
+    match = re.search(".*vertebrae_?([A-Z][0-9]+).*.stl", filename)
     if match: 
         return match.group(1)
                  
