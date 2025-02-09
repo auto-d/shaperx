@@ -113,7 +113,7 @@ with demo:
     gr.Markdown(value="# 📦 Load")
     gr.Markdown(value="## Update or retrieve new stereo lithography (STL) files.")
 
-    manifest_input = gr.Textbox(label="Dataset manifest:", value="MedShapeNetDataset_vertebrae_labeled.txt")
+    manifest_input = gr.Textbox(label="Dataset manifest:", value="MedShapeNetDataset_vertebrae_min_labeled.txt")
     with gr.Row(): 
         manifest_button = gr.Button("Download")
         manifest_output = gr.Markdown()
