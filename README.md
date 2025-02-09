@@ -32,6 +32,12 @@ The model can be demonstrated by deploying the included gradio application.
 2. python app.py 
 3. point browser at http://127.0.0.1:7860
 
+### Interface 
+
+The Gradio app allows the user to walk through the model pipeline, from downloading 3d models through classification and validation. 
+
+![alt text](app.png)
+
 ## Outstanding Issues 
 
 - ❗ renderer isn't using a light source, so image look dull and featureless - implement a new render function to allow changing the light source and incorporate into a future training run
