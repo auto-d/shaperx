@@ -1,0 +1,7 @@
+numpy==1.24.3
+pandas==2.0.3
+gradio==5.15.0
+Open3D==0.19.0
+numpy-stl==2.16.3
+matplotlib==3.7.1
+vtk==9.2.4
