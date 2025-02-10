@@ -113,14 +113,10 @@ def compute_image_count(angle_increment):
             + mesh_val.shape[0]* viewpoints_per_axis**3 
         return f"{int(count)}"
 
-def generate_split_images(samples, dir, size_pixels, angle_increment): 
+def generate_split_images(samples, dir, size, angle_increment): 
     """
     Generate an image set for one of our splits
     """
-
-    # new implementation of load, rotate and save goes in here, in lieu of
-    # below. BUT, make sure the new implementation returns a dataframe with 
-    # the generated file and associated label for follow on model training
     
     if not os.path.exists(dir): 
         os.makedirs(dir) 
@@ -129,35 +125,49 @@ def generate_split_images(samples, dir, size_pixels, angle_increment):
     insert_at = 0
     examples = []
 
+    renderer = dataset.Renderer(size)
+
     # Iterate over the samples we selected from the dataset
     for row in samples.itertuples(): 
         id = row[0]
         file = row[1]
         label = row[2]
         
-        sample = dataset.load_mesh(os.path.join(data_dir,file))
-        if len(sample.vertices) > 0: 
-            X = range(0, 360, angle_increment)
-            Y = range(0, 360, angle_increment)
-            Z = range(0, 360, angle_increment)
-            for x in X: 
-                for y in Y: 
-                    for z in Z: 
-                        rotated = dataset.rotate_mesh(sample, x, y, z)                        
-                        image_file = f"{id}-{label}-{size_pixels}-{x}-{y}-{z}.png"
-                        path = os.path.join(dir,image_file)
+        renderer.load(os.path.join(data_dir,file))
 
-                        dataset.save_image_mask(mesh=rotated, 
-                                           h=size_pixels, 
-                                           w=size_pixels, 
-                                           png=path)
-                        images.loc[insert_at] = { 'source': file, 'file' : image_file, 'label': dataset.get_class_index(label)}
-                        insert_at += 1
-                         
-                        if len(examples) < 20: 
-                            examples.append(path)
-        else: 
-            print(f"Error: unable to load vertices for model {file}. Moving to next file.")
+        # Iterate over the camera angles implied by the angle step/stride
+        
+        X = range(0, 360, angle_increment)
+        Y = range(0, 360, angle_increment)
+        Z = range(0, 360, angle_increment)
+        for x in X: 
+            for y in Y: 
+                for z in Z: 
+
+                    # Write, taking care to distinguish the full path for examples
+                    # and the path-free file name destined for pytorch
+                    image_file = f"{id}-{label}-{size}-{x}-{y}-{z}.png"
+                    path = os.path.join(dir,image_file)
+
+                    renderer.write(path)
+                    print(f"Image written to {path}")
+                    
+                    images.loc[insert_at] = { 
+                        'source': file, 
+                        'file' : image_file, 
+                        'label': dataset.get_class_index(label)
+                        }
+                    insert_at += 1
+                        
+                    if len(examples) < 20: 
+                        examples.append(path)
+                    
+                    # Apply *relative* rotation 
+                    renderer.rotate(0,0,angle_increment)                
+                # <- Don't screw up the indentation here
+                renderer.rotate(0,angle_increment,0)            
+            # <- ...or here 
+            renderer.rotate(angle_increment,0,0)
 
     return images, examples
 
@@ -321,6 +331,7 @@ with demo:
     train_button.click(fn=train_model, inputs=None, outputs=train_result)
 
     # Model Testing
-    # TODO: 
+    # TODO: run test set through model and compute various values... 
+    # plot metrics at each epoch with gd.LinePlot
 
 demo.launch(share=False)

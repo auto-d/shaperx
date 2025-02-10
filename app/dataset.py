@@ -146,3 +146,91 @@ def save_image_mask(mesh, h, w, png):
     vis.update_renderer()
     vis.capture_screen_image(png,do_render=True)    
     vis.destroy_window()
+
+
+import vtk 
+class Renderer(): 
+    """
+    Wrapper around vtk funcs to simplify manipulating a 3d model and writing 
+    to file. Improves on a few shortcomings of the Open3d implementations above. 
+    """
+    def __init__(self, size): 
+
+        self.renderer = vtk.vtkRenderer()        
+        self.renderer.SetBackground(0.5, 0.5, 0.5)  # Gray (right?)
+
+        # Add lighting
+        light = vtk.vtkLight()
+        light.SetPosition(1, 1, 1) 
+        #light.SetFocalPoint(0, 0, 0)  
+        #light.SetColor(1, 1, 1) 
+        light.SetIntensity(1.0)
+        self.renderer.AddLight(light)
+
+        # Set up an aperture to write our scene to a 2d image
+        self.render_window = vtk.vtkRenderWindow()
+        self.render_window.SetOffScreenRendering(1)
+        self.render_window.AddRenderer(self.renderer)
+        self.render_window.SetSize(size, size)  
+
+        # Create one of these thingies 
+        self.w2i = vtk.vtkWindowToImageFilter()
+        self.w2i.SetInput(self.render_window)
+        # TODO: internet says we need this... verify and uncomment
+        self.w2i.ReadFrontBufferOff()  # Ensure correct buffer is used
+
+        # I/O objects 
+        self.reader = vtk.vtkSTLReader()
+        self.writer = vtk.vtkPNGWriter()
+        self.writer.SetInputConnection(self.w2i.GetOutputPort())
+
+        # Helper to map polygonal geometry to a render pipeline
+        self.mapper = vtk.vtkPolyDataMapper()
+        self.mapper.SetInputConnection(self.reader.GetOutputPort())
+
+        self.actor = None
+
+    def load(self, file): 
+        """
+        Load an STL model
+        """
+            
+        self.reader.SetFileName(file)
+        self.reader.Update()
+
+        # Create an internal representation of our 3d model. Note we
+        # eject the previous model when we load a new one here
+        if self.actor: 
+            self.renderer.RemoveActor(self.actor)
+        self.actor = vtk.vtkActor()
+        self.actor.SetMapper(self.mapper)
+
+        self.actor.GetProperty().SetColor(0.9, 0.9, 0.9)  # Light gray
+        self.actor.GetProperty().SetSpecular(0.5)
+        self.actor.GetProperty().SetSpecularPower(20)
+
+        # Add and reset camera to fit the entire object
+        self.renderer.AddActor(self.actor)        
+        self.renderer.ResetCamera()
+
+    def rotate(self, x, y, z): 
+        """
+        Rotate the model
+        """
+        if self.actor: 
+            self.actor.RotateX(x)
+            self.actor.RotateY(y)
+            self.actor.RotateZ(z)
+            #self.actor.Modified()
+            self.render_window.Render() 
+
+    def write(self, path): 
+        """
+        Write a PNG of dim size x size to disk at the provided path 
+        """
+        self.render_window.Render()        
+        self.w2i.Modified()
+        self.w2i.Update()        
+        self.writer.SetFileName(path)        
+        self.writer.Write()
+
