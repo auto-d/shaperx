@@ -9,3 +9,4 @@ data/*.stl.1
 app/__pycache__
 experiments/*
 data/*.png
+.gradio
