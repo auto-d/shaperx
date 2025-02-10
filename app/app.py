@@ -17,6 +17,7 @@ data_dir = 'data'
 
 # Generate/retrieve experiment runs into this folder
 experiments_dir = 'experiments'
+experiment_no = 1
 
 # Metadata about all the 3d models we know about
 metadata = None
@@ -37,13 +38,34 @@ classes = len(dataset.class_map)
 # Our CNN
 net = None
 
+def setup_app_dirs(): 
+    """
+    Find an experiment number that hasn't been used
+    """
+    global experiment_no 
+    
+    while True: 
+        path = os.path.join(experiments_dir, str(experiment_no))
+        if os.path.exists(path):
+            experiment_no += 1
+        else:                 
+            os.makedirs(path) 
+            break 
+    
+    if not os.path.exists(data_dir): 
+        os.makedirs(data_dir)
+
+def get_experiment_dir(): 
+    """
+    Accessor to wrangle users of the experiment dir
+    """
+    global experiment_no
+    return os.path.join(experiments_dir,str(experiment_no))
+
 def download_dataset(filename): 
     """
     Retrieve the datasets based on a manifest of URLs
-    """
-    if not os.path.exists(data_dir): 
-        os.makedirs(data_dir) 
-
+    """    
     subprocess.run(
         ["wget", "--content-disposition"," --trust-server-names", "--no-clobber","-i",filename], 
         cwd=data_dir,
@@ -113,13 +135,13 @@ def compute_image_count(angle_increment):
             + mesh_val.shape[0]* viewpoints_per_axis**3 
         return f"{int(count)}"
 
-def generate_split_images(samples, dir, size, angle_increment): 
+def generate_split_images(samples, path, size, angle_increment): 
     """
     Generate an image set for one of our splits
     """
     
-    if not os.path.exists(dir): 
-        os.makedirs(dir) 
+    if not os.path.exists(path): 
+        os.makedirs(path) 
 
     images = pd.DataFrame(columns=['source', 'file', 'label'])
     insert_at = 0
@@ -147,10 +169,10 @@ def generate_split_images(samples, dir, size, angle_increment):
                     # Write, taking care to distinguish the full path for examples
                     # and the path-free file name destined for pytorch
                     image_file = f"{id}-{label}-{size}-{x}-{y}-{z}.png"
-                    path = os.path.join(dir,image_file)
+                    image_path = os.path.join(path,image_file)
 
-                    renderer.write(path)
-                    print(f"Image written to {path}")
+                    renderer.write(image_path)
+                    print(f"Image written to {image_path}")
                     
                     images.loc[insert_at] = { 
                         'source': file, 
@@ -160,7 +182,7 @@ def generate_split_images(samples, dir, size, angle_increment):
                     insert_at += 1
                         
                     if len(examples) < 20: 
-                        examples.append(path)
+                        examples.append(image_path)
                     
                     # Apply *relative* rotation 
                     renderer.rotate(0,0,angle_increment)                
@@ -170,10 +192,6 @@ def generate_split_images(samples, dir, size, angle_increment):
             renderer.rotate(angle_increment,0,0)
 
     return images, examples
-
-def get_experiment_dir(): 
-    # TODO: silly to hardcode this - fix 
-    return os.path.join(experiments_dir,'6')
 
 def get_trn_csv(): 
     return os.path.join(get_experiment_dir(),'train.csv')
@@ -192,14 +210,12 @@ def generate_images(size_pixels, angle_increment):
     global images_tst
     global images_val 
 
-    dir = get_experiment_dir()
-    if not os.path.exists(dir): 
-        os.makedirs(experiments_dir) 
+    path = get_experiment_dir()
 
     # Generate imagesets for each split
-    images_trn, examples = generate_split_images(mesh_trn, dir, size_pixels, angle_increment)
-    images_tst, _ = generate_split_images(mesh_tst, dir, size_pixels, angle_increment)
-    images_val, _ = generate_split_images(mesh_val, dir, size_pixels, angle_increment)
+    images_trn, examples = generate_split_images(mesh_trn, path, size_pixels, angle_increment)
+    images_tst, _ = generate_split_images(mesh_tst, path, size_pixels, angle_increment)
+    images_val, _ = generate_split_images(mesh_val, path, size_pixels, angle_increment)
 
     # Our dataframe has some extra information that needs to be ejected before we 
     # create the pytorch-esqe annotations file. This memorializes the splits and permits us to 
@@ -241,97 +257,110 @@ def classify(image):
 def test_model(): 
     pass
 
-demo = gr.Blocks()
-with demo: 
+def main(): 
+    setup_app_dirs() 
 
-    # Load
-    
-    # This works, and can be used but is here to illustrate the process for the demo
-    # or simplify download, not both. :)  I.e. we shouldn't be downloading the dataset
-    # during the demo (takes forever) 
-    gr.Markdown(value="# 📦 Load")
-    gr.Markdown(value="## Update or retrieve new stereo lithography (STL) files.")
+    demo = gr.Blocks()
+    with demo: 
 
-    manifest_input = gr.Textbox(label="Dataset manifest:", value="MedShapeNetDataset_vertebrae_min_labeled.txt")
-    with gr.Row(): 
-        manifest_button = gr.Button("Download")
-        manifest_output = gr.Markdown()
-    manifest_button.click(fn=download_dataset, inputs=manifest_input, outputs=manifest_output)
+        # Header 
+        gr.Markdown(value="# 🦴 ShapeRx Vision Pipeline")
+        gr.Markdown(value=f"Experiment #**{experiment_no}**")
+        # Load
+        
+        # This works, and can be used but is here to illustrate the process for the demo
+        # or simplify download, not both. :)  I.e. we shouldn't be downloading the dataset
+        # during the demo (takes forever) 
+        gr.Markdown(value="## 📦 Load")
+        gr.Markdown(value="### Update or retrieve new stereo lithography (STL) files.")
+        with gr.Group(): 
+            manifest_input = gr.Textbox(label="Dataset manifest:", value="MedShapeNetDataset_vertebrae_min_labeled.txt")
+            with gr.Row(): 
+                manifest_button = gr.Button("Download")
+                manifest_output = gr.Markdown()
+            manifest_button.click(fn=download_dataset, inputs=manifest_input, outputs=manifest_output)
 
-    # View Sample
-    gr.Markdown(value="## Review downloaded models")
-    with gr.Row(): 
-        height = 250
-        sample_mesh_input = gr.FileExplorer(file_count='single', root_dir=data_dir, max_height=height)
-        sample_mesh_output = gr.Model3D(height=height, label='Selected sample')
-    sample_mesh_button = gr.Button("Render sample")
-    sample_mesh_button.click(fn=retrieve_sample_mesh, inputs=sample_mesh_input, outputs=sample_mesh_output)
+        # View Sample
+        gr.Markdown(value="### Review downloaded models")
+        with gr.Group():             
+            with gr.Row(): 
+                height = 250
+                sample_mesh_input = gr.FileExplorer(file_count='single', root_dir=data_dir, max_height=height)
+                sample_mesh_output = gr.Model3D(height=height, label='Selected sample')
+            sample_mesh_button = gr.Button("Render sample")
+            sample_mesh_button.click(fn=retrieve_sample_mesh, inputs=sample_mesh_input, outputs=sample_mesh_output)
 
-    # Process
-    gr.Markdown(value="# ♻️ Process")
-    gr.Markdown(value="## Process downloaded 3d models")
-    metadata_button = gr.Button("Extract metadata")
-    metadata_output = gr.Dataframe(max_height=200)
-    metadata_button.click(fn=load_metadata, inputs=None, outputs=metadata_output)
+        # Process
+        gr.Markdown(value="## ♻️ Process")
+        gr.Markdown(value="### Process downloaded 3d models")
+        with gr.Group(): 
+            metadata_button = gr.Button("Extract metadata")
+            metadata_output = gr.Dataframe(max_height=200)
+            metadata_button.click(fn=load_metadata, inputs=None, outputs=metadata_output)
 
-    # Mesh Sampling    
-    gr.Markdown(value="## Select sources for model pipeline")
-    gr.Markdown(value=f"We'll sample for class (we have {classes} classes)")
-    with gr.Row():
-        mesh_trn_slider = gr.Slider(label="Training sources", value=5, maximum=20, step=1)
-        mesh_tst_slider = gr.Slider(label="Test sources", value=1, maximum=20, step=1)
-        mesh_val_slider = gr.Slider(label="Validation sources", value=1, maximum=20, step=1)
-    mesh_sample_button = gr.Button("Sample")
-    with gr.Row(): 
-        mesh_trn_output = gr.Dataframe(label="Training sources selected")
-        mesh_tst_output = gr.Dataframe(label="Training sources selected")
-        mesh_val_output = gr.Dataframe(label="Training sources selected")
-    mesh_sample_button.click(
-        fn=sample_metadata, 
-        inputs=[
-            mesh_trn_slider, 
-            mesh_tst_slider, 
-            mesh_val_slider,
-        ],
-        outputs=[
-            mesh_trn_output,
-            mesh_tst_output,
-            mesh_val_output,
-        ])
+        # Mesh Sampling    
+        gr.Markdown(value="### Select sources for model pipeline")
+        gr.Markdown(value=f"We'll sample for class (we have {classes} classes)")
+        with gr.Group():             
+            with gr.Row():
+                mesh_trn_slider = gr.Slider(label="Training sources", value=5, maximum=20, step=1)
+                mesh_tst_slider = gr.Slider(label="Test sources", value=1, maximum=20, step=1)
+                mesh_val_slider = gr.Slider(label="Validation sources", value=1, maximum=20, step=1)
+            mesh_sample_button = gr.Button("Sample")
+            with gr.Row(): 
+                mesh_trn_output = gr.Dataframe(label="Training sources selected")
+                mesh_tst_output = gr.Dataframe(label="Training sources selected")
+                mesh_val_output = gr.Dataframe(label="Training sources selected")
+            mesh_sample_button.click(
+                fn=sample_metadata, 
+                inputs=[
+                    mesh_trn_slider, 
+                    mesh_tst_slider, 
+                    mesh_val_slider,
+                ],
+                outputs=[
+                    mesh_trn_output,
+                    mesh_tst_output,
+                    mesh_val_output,
+                ])
 
-    # Image Generation
-     
-    # As above with loading, this is great for experimentation, but shouldn't be run 
-    # during the demo with anything but trivial values since it will take hours to 
-    # generate and can safely be skipped. 
-    gr.Markdown(value="# 🪄 Generate")
-    gr.Markdown(value="Permute the various facets of the rendering and generate an image set")    
-    
-    with gr.Row(): 
-        image_size = gr.Slider(label="Image size (pixels)", value=64, minimum=32, maximum=256, step=32)
-        image_angle = gr.Slider(label="Angle increments (degrees)", value=45, minimum=0, maximum=360, step=15)
-    with gr.Row(): 
-        image_count_text = gr.Markdown(value="Images to generate:")
-        image_count = gr.Markdown(value="*Extract metadata and sample to see estimate*")
-    image_angle.release(fn=compute_image_count, inputs=[image_angle], outputs=image_count)
-    image_generate_button = gr.Button("Generate images")
-    image_gallery_label = gr.Markdown(value="Training set examples:")
-    image_gallery = gr.Gallery()
+        # Image Generation
+        
+        # As above with loading, this is great for experimentation, but shouldn't be run 
+        # during the demo with anything but trivial values since it will take hours to 
+        # generate and can safely be skipped. 
+        gr.Markdown(value="## 🪄 Generate")
+        gr.Markdown(value="Permute the various facets of the rendering and generate an image set")    
+        with gr.Group():                         
+            with gr.Row(): 
+                image_size = gr.Slider(label="Image size (pixels)", value=64, minimum=32, maximum=256, step=32)
+                image_angle = gr.Slider(label="Angle increments (degrees)", value=45, minimum=0, maximum=360, step=15)
+            with gr.Row(): 
+                image_count_text = gr.Markdown(value="Images to generate:")
+                image_count = gr.Markdown(value="*Extract metadata and sample to see estimate*")
+            image_angle.release(fn=compute_image_count, inputs=[image_angle], outputs=image_count)
+            image_generate_button = gr.Button("Generate images")
+            image_gallery_label = gr.Markdown(value="Training set examples:")
+            image_gallery = gr.Gallery()
 
-    image_generate_button.click(fn=generate_images, inputs=[image_size, image_angle], outputs=image_gallery)
-    
-    # Model Training 
-    gr.Markdown(value="# ⚙️ Train")
-    train_button = gr.Button("Train CNN")
-    with gr.Row(): 
-        gr.Markdown(value="Training result:")
-        train_result = gr.Markdown()
+            image_generate_button.click(fn=generate_images, inputs=[image_size, image_angle], outputs=image_gallery)
+        
+        # Model Training 
+        gr.Markdown(value="## ⚙️ Train")
+        with gr.Group():            
+            train_button = gr.Button("Train CNN")
+            with gr.Row(): 
+                gr.Markdown(value="Training result:")
+                train_result = gr.Markdown()
 
-    #TODO: adjust hyperparameters from the UI?
-    train_button.click(fn=train_model, inputs=None, outputs=train_result)
+            #TODO: adjust hyperparameters from the UI?
+            train_button.click(fn=train_model, inputs=None, outputs=train_result)
 
-    # Model Testing
-    # TODO: run test set through model and compute various values... 
-    # plot metrics at each epoch with gd.LinePlot
+        # Model Testing
+        # TODO: run test set through model and compute various values... 
+        # plot metrics at each epoch with gd.LinePlot
 
-demo.launch(share=False)
+    demo.launch(share=False)
+
+if __name__ == "__main__":
+    main()

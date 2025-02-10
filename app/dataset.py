@@ -58,12 +58,12 @@ def decode_label(filename:str) -> str:
     if match: 
         return match.group(1)
                  
-def load_mesh_metadata(dir:str) -> pd.DataFrame: 
+def load_mesh_metadata(path:str) -> pd.DataFrame: 
     """
     Retrieve metadata for downloaded mesh files in the provided directory
     """
     metadata = pd.DataFrame(columns=['filename', 'label'])
-    for i, file in enumerate(os.listdir(dir)): 
+    for i, file in enumerate(os.listdir(path)): 
         if file.endswith('stl'): 
             metadata.loc[i] = {'filename': file, 'label': decode_label(file)}
 
