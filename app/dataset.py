@@ -221,7 +221,11 @@ class Renderer():
             self.actor.RotateX(x)
             self.actor.RotateY(y)
             self.actor.RotateZ(z)
-            #self.actor.Modified()
+            self.actor.Modified()
+            
+            # This is essential, as we move we need the camera is 
+            # centered
+            self.renderer.ResetCamera()
             self.render_window.Render() 
 
     def write(self, path): 
