@@ -29,12 +29,17 @@ def extract_features(stl_file):
     return [num_faces, volume, area]
 
 
-def prepare_data(stl_folder, labels):
+def prepare_data(stl_folder):
     features = []
+    labels = []
     for filename in os.listdir(stl_folder):
         if filename.endswith(".stl"):
             file_path = os.path.join(stl_folder, filename)
             features.append(extract_features(file_path))
+            
+            # Extract label from filename
+            label = filename.split('_')[1].split('.')[0]
+            labels.append(label)
     
     X = np.array(features)
     y = np.array(labels)
@@ -53,7 +58,7 @@ from sklearn.svm import SVC
 from sklearn.model_selection import GridSearchCV
 
 def train_svm(X_train, y_train):
-    param_grid = {'C': [0.1, 1, 10, 100], 'kernel': ['rbf', 'poly', 'sigmoid']}
+    param_grid = {'C': [0.1, 1, 10, 100], 'kernel': ['rbf', 'poly', 'relu']}
     svm = SVC()
     grid_search = GridSearchCV(svm, param_grid, cv=5)
     grid_search.fit(X_train, y_train)
@@ -71,10 +76,10 @@ def evaluate_model(model, X_test, y_test):
 
 # Folder path
 stl_folder = "data"
-labels = []  # data Labels 
+
 
 # Splitting data
-X_train, X_test, y_train, y_test, scaler = prepare_data(stl_folder, labels)
+X_train, X_test, y_train, y_test, scaler = prepare_data(stl_folder)
 
 # Model training
 svm_model = train_svm(X_train, y_train)
@@ -86,7 +91,7 @@ print("Classification Report:")
 print(report)
 
 # Testing Data
-new_stl_file = "path/to/new/stl/file.stl"
+new_stl_file = "data/002056_vertebraeC5.stl"
 new_features = extract_features(new_stl_file)
 new_features_scaled = scaler.transform([new_features])
 prediction = svm_model.predict(new_features_scaled)
