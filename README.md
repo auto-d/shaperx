@@ -40,6 +40,16 @@ The Gradio app allows the user to walk through the model pipeline, from download
 
 ## Outstanding Issues 
 
+In descending order of priority:
+
+- ❗ implement SVM
+- ❗ convert output layer back to class labels
+- ❗ implement validation
+- ❗ implement accuracy, precision, recall metrics
+- ❗ implement retraining with train + val
+- ❗ implement validation againss test set
+- ❗ stand up an EC2 instance to host the gradio app and test it
+- ❗ swap test and validation (i had them backward)
 - ❗ a number of files are not loading into the mesh, warning printed is shown below. for now we are ignoring, but we should process the whole dataset to remove these and then resample, otherwise we'll have unintended class imbalance
   > [Open3D WARNING] Unable to load file data/001200_vertebrae.stl with ASSIMP: Unable to open file "data/001200_vertebrae.stl".
 - ❗ we aren't inducing any scale or lighting changes in our images, remedy that! (?)
