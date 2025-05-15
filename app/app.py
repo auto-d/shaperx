@@ -2,14 +2,12 @@ import gradio as gr
 import subprocess
 import os 
 import pandas as pd
-import numpy as np
 import re 
 import dataset
 import torch
 import torchvision 
 import torchvision.transforms as transforms
 import cnn 
-from svm import load_image, svm_model_train
 
 ## Disclaimer: the use of globals here is mildly annoying, but passing all 
 ## this state around in gradio isn't super elegant, so we opt to suffer these
@@ -229,33 +227,7 @@ def generate_images(size_pixels, angle_increment):
     annotations = images_val.drop(labels='source', axis='columns')
     annotations.to_csv(get_val_csv(), index=False)
 
-    image_data_list = []
-    labels_list = []
-
-    for row in mesh_trn.itertuples():
-        id = row[0]
-        file = row[1]
-        label = row[2]
-
-    for x in X:
-            for y in Y:
-                for z in Z:
-                    image_file = f"{id}-{label}-{size_pixels}-{x}-{y}-{z}.png"
-                    image_path = os.path.join(path, image_file)
-                    
-                    # Preprocess the image
-                    image_data = load_image(image_path)
-                    image_data_list.append(image_data)
-                    labels_list.append(dataset.get_class_index(label))
-
-    X = np.array(image_data_list)
-    y = np.array(labels_list)
-
-    svm_model=svm_model_train(X,y)
-
-
-
-    return examples, svm_model
+    return examples
 
 def train_model(): 
     """
