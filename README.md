@@ -2,12 +2,12 @@
 
 Classification of anatomical shapes. 
 
-Theme: Healt, wellness and fitness
+Theme: Health, wellness and fitness
 
 ## Design
 
 1. Naive approach : B&w histograms? 
-2. Non-deep learning approach : ?
+2. Non-deep learning approach : Support Vector Machine (SVM) classifier
 3. NN-based approach : PyTorch-based convolutional neural network 
 
 ## Development
