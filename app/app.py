@@ -281,6 +281,7 @@ def test_model():
     pass
 
 def main(): 
+    global experiment_no
     setup_app_dirs() 
 
     demo = gr.Blocks()
@@ -325,7 +326,7 @@ def main():
 
         # Mesh Sampling    
         gr.Markdown(value="### Select sources for model pipeline")
-        gr.Markdown(value=f"We'll sample for class (we have {classes} classes)")
+        gr.Markdown(value=f"We'll sample for each class (we have {classes} classes)")
         with gr.Group():             
             with gr.Row():
                 mesh_trn_slider = gr.Slider(label="Training sources", value=5, maximum=20, step=1)
