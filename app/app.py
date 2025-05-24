@@ -360,7 +360,7 @@ def main():
         # TODO: run test set through model and compute various values... 
         # plot metrics at each epoch with gd.LinePlot
 
-    demo.launch(share=False)
+    demo.launch(share=True)
 
 if __name__ == "__main__":
     main()
