@@ -55,6 +55,29 @@ def setup_app_dirs():
     if not os.path.exists(data_dir): 
         os.makedirs(data_dir)
 
+def list_experiments(): 
+    """
+    Inventory experiments
+    """
+    dirs = os.listdir('experiments')
+    experiments = [int(dir) for dir in dirs if dir.isdigit()]
+    experiments.sort()
+    return experiments
+
+def change_experiment(number:int): 
+    """
+    Update the current experiment, returns a textual representation to simplify display
+    """
+    global experiment_no 
+    
+    if type(number) != int: 
+        raise ValueError(f"Experiment must be an integer value! Got {type(number)}")
+    
+    if number not in list_experiments(): 
+        raise ValueError(f"Experiment {number} not a known experiment number!")
+        
+    experiment_no = number  
+
 def get_experiment_dir(): 
     """
     Accessor to wrangle users of the experiment dir
@@ -263,9 +286,11 @@ def main():
     demo = gr.Blocks()
     with demo: 
 
-        # Header 
+        # Header         
         gr.Markdown(value="# 🦴 ShapeRx Vision Pipeline")
-        gr.Markdown(value=f"Experiment #**{experiment_no}**")
+        experiment_picker = gr.Dropdown(choices=list_experiments(), value=experiment_no, label='Experiment', interactive=True)
+        experiment_picker.change(fn=change_experiment, inputs=[experiment_picker])
+
         # Load
         
         # This works, and can be used but is here to illustrate the process for the demo
