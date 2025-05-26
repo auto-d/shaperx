@@ -2,12 +2,14 @@ import gradio as gr
 import subprocess
 import os 
 import pandas as pd
+import numpy as np
 import re 
 import dataset
 import torch
 import torchvision 
 import torchvision.transforms as transforms
 import cnn 
+import svm
 
 ## Disclaimer: the use of globals here is mildly annoying, but passing all 
 ## this state around in gradio isn't super elegant, so we opt to suffer these
@@ -35,7 +37,9 @@ images_val = None
 # Count of classes in the dataset
 classes = len(dataset.class_map)
 
-# Our CNN
+# Our models
+naive = None 
+svm = None
 net = None
 
 def setup_app_dirs(): 
@@ -54,6 +58,29 @@ def setup_app_dirs():
     
     if not os.path.exists(data_dir): 
         os.makedirs(data_dir)
+
+def list_experiments(): 
+    """
+    Inventory experiments
+    """
+    dirs = os.listdir('experiments')
+    experiments = [int(dir) for dir in dirs if dir.isdigit()]
+    experiments.sort()
+    return experiments
+
+def change_experiment(number:int): 
+    """
+    Update the current experiment, returns a textual representation to simplify display
+    """
+    global experiment_no 
+    
+    if type(number) != int: 
+        raise ValueError(f"Experiment must be an integer value! Got {type(number)}")
+    
+    if number not in list_experiments(): 
+        raise ValueError(f"Experiment {number} not a known experiment number!")
+        
+    experiment_no = number  
 
 def get_experiment_dir(): 
     """
@@ -229,7 +256,48 @@ def generate_images(size_pixels, angle_increment):
 
     return examples
 
-def train_model(): 
+def prepare_naive_model(): 
+    """
+    Prepare a histogram classifier 
+    """
+    global naive
+    
+    # TODO - build average histograms for all training samples
+
+def train_svm_model(): 
+    """
+    Train a vanilla CNN to classify using the training set
+    """
+    global svm
+    
+    # TODO: validate this loads and trains
+
+    data_dir = get_experiment_dir()
+    categories = sorted([d for d in os.listdir(data_dir) 
+                        if os.path.isdir(os.path.join(data_dir, d))])
+    print("Categories found:", categories)
+
+    X, y, filenames = svm.load_dataset(data_dir, categories)
+    print(f"Dataset loaded with {len(X)} samples")
+    print(f"Feature vector length: {X[0].shape[0]}")
+    print(f"Number of classes: {len(categories)}")
+
+    # Find classes with too small samples 
+    unique_classes, class_counts = np.unique(y, return_counts=True)
+    for cls, count in zip(unique_classes, class_counts):
+        print(f"Class {categories[cls]}: {count} samples")
+    invalid_classes = [categories[cls] for cls, count in zip(unique_classes, class_counts) if count < 2]
+    if invalid_classes:
+        raise ValueError(f"Classes with insufficient samples: {invalid_classes}")
+        
+    svm, scaler = svm.train_validate_model(
+        data_dir=data_dir,
+        categories=categories,
+        test_size=0.1,
+        random_state=0,
+    )
+
+def train_cnn_model(): 
     """
     Train a vanilla CNN to classify using the training set
     """
@@ -246,7 +314,34 @@ def train_model():
 
     return result
 
-def classify(image): 
+def classify_naive(image): 
+    """
+    Classify an image with our naive model
+    """
+    global naive
+    
+    prediction = None 
+
+    # TODO: implement
+    
+    return prediction
+
+def classify_svm(image): 
+    """
+    Classify an image with our classical ML model 
+    """
+    global svm
+    
+    prediction = None 
+    
+    # TODO: implement
+    
+    return prediction
+
+def classify_cnn(image): 
+    """
+    Classify an image with our neural network 
+    """
     global net
     
     # TODO: we need to pass the class label back here, not the logits
@@ -254,18 +349,18 @@ def classify(image):
     
     return prediction
 
-def test_model(): 
-    pass
-
 def main(): 
+    global experiment_no
     setup_app_dirs() 
 
     demo = gr.Blocks()
     with demo: 
 
-        # Header 
+        # Header         
         gr.Markdown(value="# 🦴 ShapeRx Vision Pipeline")
-        gr.Markdown(value=f"Experiment #**{experiment_no}**")
+        experiment_picker = gr.Dropdown(choices=list_experiments(), value=experiment_no, label='Experiment', interactive=True)
+        experiment_picker.change(fn=change_experiment, inputs=[experiment_picker])
+
         # Load
         
         # This works, and can be used but is here to illustrate the process for the demo
@@ -300,7 +395,7 @@ def main():
 
         # Mesh Sampling    
         gr.Markdown(value="### Select sources for model pipeline")
-        gr.Markdown(value=f"We'll sample for class (we have {classes} classes)")
+        gr.Markdown(value=f"We'll sample for each class (we have {classes} classes)")
         with gr.Group():             
             with gr.Row():
                 mesh_trn_slider = gr.Slider(label="Training sources", value=5, maximum=20, step=1)
@@ -348,13 +443,23 @@ def main():
         # Model Training 
         gr.Markdown(value="## ⚙️ Train")
         with gr.Group():            
-            train_button = gr.Button("Train CNN")
             with gr.Row(): 
-                gr.Markdown(value="Training result:")
-                train_result = gr.Markdown()
+                 with gr.Row(): 
+                    train_naive_button = gr.Button("Prepare Naive")
+                    gr.Markdown(value="Preparation result:")
+                    train_naive_result = gr.Markdown()
+                with gr.Row(): 
+                    train_svm_button = gr.Button("Train SVM")                
+                    gr.Markdown(value="Training result:")
+                    train_svm_result = gr.Markdown()
+                with gr.Row(): 
+                    train_cnn_button = gr.Button("Train CNN")                
+                    gr.Markdown(value="Training result:")
+                    train_cnn_result = gr.Markdown()
 
-            #TODO: adjust hyperparameters from the UI?
-            train_button.click(fn=train_model, inputs=None, outputs=train_result)
+            train_naive_button.click(fn=prepare_naive_model, inputs=None, outputs=train_naive_result)
+            train_svm_button.click(fn=train_svm_model, inputs=None, outputs=train_svm_result)
+            train_cnn_button.click(fn=train_cnn_model, inputs=None, outputs=train_cnn_result)
 
         # Model Testing
         # TODO: run test set through model and compute various values... 
