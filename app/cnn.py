@@ -21,42 +21,54 @@ class Net(nn.Module):
 
     def __init__(self):
         super().__init__()
-        
-        # in, out, kernel size
-        self.conv1 = nn.Conv2d(3, 6, 5)
-        self.pool = nn.MaxPool2d(2, 2)
+                
+        # Input channels, output channels, kernel height/width
+        self.conv1 = nn.Conv2d(3, 6, 5) 
+        self.pool = nn.MaxPool2d(2, 2)         
         self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(16 * 5 * 5, 120)
+        self.fc1 = nn.Linear(16 * 5 * 5, 120) 
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, len(class_map))
 
     def forward(self, x):
         # 1. Convolution + pooling
+        #
+        # Each filter here (conv_2d out_channels) is a unique opportunity to 
+        # learn a useful pattern in the input. The filter count used is based on 
+        # the pytorch example, but if we had the compute we would want to do a 
+        # search over these values (as with most other network parameters here)!
+        #
         # input:       3 x 32^2 
         # conv @ 6, 5: 6 x 28^2
         # pool @ 2x2:  6 x 14^2
-        x = self.pool(F.relu(self.conv1(x)))
+        x = self.conv1(x)
+        x = F.relu(x)
+        x = self.pool(x)
 
         # 2. Convolution + pooling
         # input:       6 x 14^2 
         # conv @ 16,5: 16 x 10^2
         # pool @ 2x2:  16 x 5^2
-        x = self.pool(F.relu(self.conv2(x)))
+        x = self.conv2(x)
+        x = F.relu(x)
+        x = self.pool(x)
 
         # 3. Reshape
         # input:       16 x 5^2
         # flatten @ 1: 1 x 400
         x = torch.flatten(x, 1) # flatten all dimensions except batch
         
-        # 4. Fully-connecter
+        # 4. Fully-connected
         # input:       1 x 400
         # linear:      1 x 120
-        x = F.relu(self.fc1(x))
+        x = self.fc1(x)
+        x = F.relu(x)
         
         # 5. Fully-connected 
         # input:       1 x 120
         # linear:      1 x 84
-        x = F.relu(self.fc2(x))
+        x = self.fc2(x)
+        x = F.relu(x)
             
         # 6. Fully-connected output 
         # input:       1 x 84
@@ -131,14 +143,16 @@ def train(loader, net, iterations=2):
 
             # forward + backward + optimize
             outputs = net(inputs)
+
+            # TODO: something about our loss calculation or labels is busted ... we are starting
+            # with a really low loss that monotically increases. fine if the network is getting 
+            # worse than random guesses, but it shouldn't start out at a low loss reliably
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
 
             # print statistics
             running_loss += loss.item()
-            if i % 20 == 19:  
-                print(f"[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}")
-                running_loss = 0.0
+            print(f"[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}")
     
     return "Training complete!"

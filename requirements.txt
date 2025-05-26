@@ -4,6 +4,8 @@ gradio==5.30.0
 Open3D==0.19.0
 numpy-stl==2.16.3
 matplotlib==3.7.1
+scikit-learn==1.2.2
+pillow==10.4.0
 vtk==9.4.2
 torch==2.7.0
 torchvision==0.22.0
