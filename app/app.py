@@ -242,7 +242,7 @@ def train_model():
     loader = cnn.get_data_loader(get_trn_csv(), get_experiment_dir(), batch_size=2) 
     
     # Train 
-    result = cnn.train(loader, net)
+    result = cnn.train(loader=loader, model=net)
 
     return result
 

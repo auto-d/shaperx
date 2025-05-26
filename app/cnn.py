@@ -111,12 +111,18 @@ def get_data_loader(annotations_file, img_dir, batch_size=5):
     
     return loader
 
-def train(loader, net, iterations=2):
+def train(loader, model, iterations=2):
     """
     Train the model with the provided dataset
     """
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    model.train()
+    model = model.to(device)
+    
+    loss_fn = nn.CrossEntropyLoss() 
+
+    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
     for epoch in range(iterations):  # loop over the dataset multiple times
 
@@ -125,20 +131,40 @@ def train(loader, net, iterations=2):
 
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
+            inputs.to(device)
+            labels.to(device)
 
             # zero the parameter gradients
             optimizer.zero_grad()
 
             # forward + backward + optimize
-            outputs = net(inputs)
-            loss = criterion(outputs, labels)
+            outputs = model(inputs)
+            loss = loss_fn(outputs, labels)
             loss.backward()
             optimizer.step()
 
             # print statistics
             running_loss += loss.item()
-            if i % 20 == 19:  
+            if i % 20 == 0:  
                 print(f"[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}")
                 running_loss = 0.0
     
     return "Training complete!"
+
+def eval(): 
+    """
+    Evaluate the model on a test set
+    """
+    pass 
+
+def save_model(model, path):
+    """
+    Save the model to a file
+    """
+    torch.save(model, os.path.join(path, "cnn.pt"))
+    print(f"Model saved to {path}")
+
+def load_model(path): 
+    model = torch.load(os.path.join(path, "cnn.pt"))
+
+    return model
