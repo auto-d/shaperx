@@ -4,6 +4,7 @@ import re
 import open3d as o3d
 import copy 
 import numpy as np
+import cv2
 
 from open3d.visualization import rendering
 
@@ -146,6 +147,91 @@ def save_image_mask(mesh, h, w, png):
     vis.update_renderer()
     vis.capture_screen_image(png,do_render=True)    
     vis.destroy_window()
+
+def generate_image_set(samples, input_path, output_path, size, angle_increment): 
+    """
+    Generate an image set for one of our splits
+    """
+    
+    if not os.path.exists(output_path): 
+        os.makedirs(output_path) 
+
+    metadata = pd.DataFrame(columns=['source', 'file', 'label'])
+    insert_at = 0
+    examples = []
+
+    renderer = Renderer(size)
+
+    # Iterate over the samples we selected from the dataset
+    for row in samples.itertuples(): 
+        id = row[0]
+        file = row[1]
+        label = row[2]
+        
+        renderer.load(os.path.join(input_path,file))
+
+        # Iterate over the camera angles implied by the angle step/stride
+        
+        X = range(0, 360, angle_increment)
+        Y = range(0, 360, angle_increment)
+        Z = range(0, 360, angle_increment)
+        for x in X: 
+            for y in Y: 
+                for z in Z: 
+
+                    # Write, taking care to distinguish the full path for examples
+                    # and the path-free file name destined for pytorch
+                    image_file = f"{id}-{label}-{size}-{x}-{y}-{z}.png"
+                    image_path = os.path.join(output_path,image_file)
+
+                    renderer.write(image_path)
+                    print(f"Image written to {image_path}")
+                    
+                    metadata.loc[insert_at] = { 
+                        'source': file, 
+                        'file' : image_file, 
+                        'label': get_class_index(label)
+                        }
+                    insert_at += 1
+                        
+                    if len(examples) < 20: 
+                        examples.append(image_path)
+                    
+                    # Apply *relative* rotation 
+                    renderer.rotate(0,0,angle_increment)                
+                # <- Don't screw up the indentation here
+                renderer.rotate(0,angle_increment,0)            
+            # <- ...or here 
+            renderer.rotate(angle_increment,0,0)
+
+    return metadata, examples
+
+def save_image_set(metadata, path): 
+    """
+    Write an image set to disk at the provided location 
+    """    
+    # Our dataframe has some extra information that needs to be ejected before we 
+    # create the pytorch-esqe annotations file.
+    annotations = metadata.drop(labels='source', axis='columns')
+    annotations.to_csv(path, index=False)
+
+def load_image(self, image_path) -> np.ndarray: 
+    """
+    Load an image and return a grayscale image
+    """
+    # Our image generation process wrote everything to disk as 3-channel, but our lightsources are white
+    # and there are no colored surfaces on these models, so everything is grayscale. Collapse the 
+    # three channels down to 1 here to reduce the computation required to train our models
+    img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    return gray 
+    
+def load_image_set(self, path) -> np.ndarray: 
+    """
+    Load an image set off disk from the provided path
+    """
+    annotations = pd.read_csv(path)
+
 
 
 import vtk 

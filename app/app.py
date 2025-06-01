@@ -162,64 +162,6 @@ def compute_image_count(angle_increment):
             + mesh_val.shape[0]* viewpoints_per_axis**3 
         return f"{int(count)}"
 
-def generate_split_images(samples, path, size, angle_increment): 
-    """
-    Generate an image set for one of our splits
-    """
-    
-    if not os.path.exists(path): 
-        os.makedirs(path) 
-
-    images = pd.DataFrame(columns=['source', 'file', 'label'])
-    insert_at = 0
-    examples = []
-
-    renderer = dataset.Renderer(size)
-
-    # Iterate over the samples we selected from the dataset
-    for row in samples.itertuples(): 
-        id = row[0]
-        file = row[1]
-        label = row[2]
-        
-        renderer.load(os.path.join(data_dir,file))
-
-        # Iterate over the camera angles implied by the angle step/stride
-        
-        X = range(0, 360, angle_increment)
-        Y = range(0, 360, angle_increment)
-        Z = range(0, 360, angle_increment)
-        for x in X: 
-            for y in Y: 
-                for z in Z: 
-
-                    # Write, taking care to distinguish the full path for examples
-                    # and the path-free file name destined for pytorch
-                    image_file = f"{id}-{label}-{size}-{x}-{y}-{z}.png"
-                    image_path = os.path.join(path,image_file)
-
-                    renderer.write(image_path)
-                    print(f"Image written to {image_path}")
-                    
-                    images.loc[insert_at] = { 
-                        'source': file, 
-                        'file' : image_file, 
-                        'label': dataset.get_class_index(label)
-                        }
-                    insert_at += 1
-                        
-                    if len(examples) < 20: 
-                        examples.append(image_path)
-                    
-                    # Apply *relative* rotation 
-                    renderer.rotate(0,0,angle_increment)                
-                # <- Don't screw up the indentation here
-                renderer.rotate(0,angle_increment,0)            
-            # <- ...or here 
-            renderer.rotate(angle_increment,0,0)
-
-    return images, examples
-
 def get_trn_csv(): 
     return os.path.join(get_experiment_dir(),'train.csv')
 
@@ -229,7 +171,7 @@ def get_tst_csv():
 def get_val_csv(): 
     return os.path.join(get_experiment_dir(),'val.csv')
 
-def generate_images(size_pixels, angle_increment):
+def generate_image_set(size_pixels, angle_increment):
     """
     Use our 3d models to permute and emit images for each split
     """
@@ -240,29 +182,47 @@ def generate_images(size_pixels, angle_increment):
     path = get_experiment_dir()
 
     # Generate imagesets for each split
-    images_trn, examples = generate_split_images(mesh_trn, path, size_pixels, angle_increment)
-    images_tst, _ = generate_split_images(mesh_tst, path, size_pixels, angle_increment)
-    images_val, _ = generate_split_images(mesh_val, path, size_pixels, angle_increment)
+    images_trn, examples = dataset.generate_image_set(mesh_trn, data_dir, path, size_pixels, angle_increment)
+    images_tst, _ = dataset.generate_image_set(mesh_tst, data_dir, path, size_pixels, angle_increment)
+    images_val, _ = dataset.generate_image_set(mesh_val, data_dir, path, size_pixels, angle_increment)
 
-    # Our dataframe has some extra information that needs to be ejected before we 
-    # create the pytorch-esqe annotations file. This memorializes the splits and permits us to 
-    # pick up later with these labelsets.
-    annotations = images_trn.drop(labels='source', axis='columns')
-    annotations.to_csv(get_trn_csv(), index=False)
-    annotations = images_tst.drop(labels='source', axis='columns')
-    annotations.to_csv(get_tst_csv(), index=False)
-    annotations = images_val.drop(labels='source', axis='columns')
-    annotations.to_csv(get_val_csv(), index=False)
+    dataset.save_image_set(images_trn, get_trn_csv())
+    dataset.save_image_set(images_tst, get_tst_csv())
+    dataset.save_image_set(images_val, get_val_csv())
 
     return examples
 
-def prepare_naive_model(): 
+#TODO: ensure this is called if no images have been generated (the typical case) before attempting 
+#training or prediction 
+def load_image_set(): 
+    """
+    Retrieve saved image metadata off disk for our three splits
+    """`
+    global images_trn 
+    global images_tst
+    global images_val 
+
+    images_trn = dataset.load_image_set(get_trn_csv())
+    images_tst = dataset.load_image_set(get_tst_csv())
+    images_val = dataset.load_image_set(get_val_csv())
+
+def train_naive_model(): 
     """
     Prepare a histogram classifier 
     """
+    global images_trn
     global naive
+
+    #TODO: pull the image size from the filename, we need it to program the element
+    X = []
+    y = images_trn.label.unique()
+
+    for index, row in images_trn.iterrows(): 
+        file = get_experiment_dir() + "/" + row.file
+        X.append(dataset.load_image(file))
     
-    # TODO - build average histograms for all training samples
+    naive = naive.NaiveEstimator()
+    naive.fit(X, y)
 
 def train_svm_model(): 
     """
@@ -438,13 +398,13 @@ def main():
             image_gallery_label = gr.Markdown(value="Training set examples:")
             image_gallery = gr.Gallery()
 
-            image_generate_button.click(fn=generate_images, inputs=[image_size, image_angle], outputs=image_gallery)
+            image_generate_button.click(fn=generate_image_set, inputs=[image_size, image_angle], outputs=image_gallery)
         
         # Model Training 
         gr.Markdown(value="## ⚙️ Train")
         with gr.Group():            
             with gr.Row(): 
-                 with gr.Row(): 
+                with gr.Row(): 
                     train_naive_button = gr.Button("Prepare Naive")
                     gr.Markdown(value="Preparation result:")
                     train_naive_result = gr.Markdown()
@@ -457,7 +417,7 @@ def main():
                     gr.Markdown(value="Training result:")
                     train_cnn_result = gr.Markdown()
 
-            train_naive_button.click(fn=prepare_naive_model, inputs=None, outputs=train_naive_result)
+            train_naive_button.click(fn=train_naive_model, inputs=None, outputs=train_naive_result)
             train_svm_button.click(fn=train_svm_model, inputs=None, outputs=train_svm_result)
             train_cnn_button.click(fn=train_cnn_model, inputs=None, outputs=train_cnn_result)
 
