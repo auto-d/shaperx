@@ -1,6 +1,8 @@
 
 import os
+import pickle
 import numpy as np
+from sklearn.svm import SVC
 from PIL import Image
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
@@ -21,7 +23,7 @@ def load_image(path):
 
 def svm_model_train(data, labels):
     
-    from sklearn.svm import SVC
+    
     svm_model = SVC()
     svm_model.fit(data, labels)
     return svm_model
@@ -138,5 +140,34 @@ def predict_on_new_images(model, scaler, categories, image_paths):
     
     return predictions
 
+def eval(): 
+    """
+    Evaluate the model on a test set
+    """
+    pass 
 
+def save_model(model:SVC, path):
+    """
+    Save the model to a file
+    """    
+    filename = os.path.join(path, 'svm.pkl')
+    with open(filename, 'wb') as f: 
+        pickle.dump(model, f)
+    
+    print(f"Model saved to {path}")
+
+def load_model(path): 
+    """
+    Load our naive model off disk
+    """
+    model = None
+
+    filename = os.path.join(path, 'svm.pkl')
+    with open(filename, 'r') as f: 
+        model = pickle.load(f) 
+    
+    if type(model) != SVC: 
+        raise ValueError(f"Unexpected type {type(model)} found in {filename}")
+
+    return model
 

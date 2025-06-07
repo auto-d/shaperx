@@ -1,8 +1,10 @@
 import cv2
+import os
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator 
 import matplotlib.pyplot as plt
+import pickle
 
 class ShapeRxEstimator(BaseEstimator): 
     """
@@ -110,3 +112,34 @@ class NaiveEstimator(ShapeRxEstimator):
         Sklearn expectation for CV scoring 
         """
         return np.mean(self.predict(X) == y)
+    
+def eval(): 
+    """
+    Evaluate the model on a test set
+    """
+    pass 
+
+def save_model(model:NaiveEstimator, path):
+    """
+    Save the model to a file
+    """    
+    filename = os.path.join(path, 'naive.pkl')
+    with open(filename, 'wb') as f: 
+        pickle.dump(model, f)
+    
+    print(f"Model saved to {path}")
+
+def load_model(path): 
+    """
+    Load our naive model off disk
+    """
+    model = None
+
+    filename = os.path.join(path, 'naive.pkl')
+    with open(filename, 'r') as f: 
+        model = pickle.load(f) 
+    
+    if type(model) != NaiveEstimator: 
+        raise ValueError(f"Unexpected type {type(model)} found in {filename}")
+
+    return model
