@@ -4,7 +4,6 @@ import re
 import open3d as o3d
 import copy 
 import numpy as np
-import cv2
 
 from open3d.visualization import rendering
 
@@ -224,18 +223,7 @@ def save_image_set(metadata, path):
     # create the pytorch-esqe annotations file.
     annotations = metadata.drop(labels='source', axis='columns')
     annotations.to_csv(path, index=False)
-
-def load_image(image_path) -> np.ndarray: 
-    """
-    Load an image and return a grayscale image
-    """
-    # Our image generation process wrote everything to disk as 3-channel, but our lightsources are white
-    # and there are no colored surfaces on these models, so everything is grayscale. Collapse the 
-    # three channels down to 1 here to reduce the computation required to train our models
-    img = cv2.imread(image_path, cv2.IMREAD_COLOR)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    return gray 
-    
+   
 def load_image_set(path) -> np.ndarray: 
     """
     Load an image set off disk from the provided path

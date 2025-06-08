@@ -5,32 +5,9 @@ import pandas as pd
 from sklearn.base import BaseEstimator 
 import matplotlib.pyplot as plt
 import pickle
+import image_dataset
 
-class ShapeRxEstimator(BaseEstimator): 
-    """
-    Interface for loading, fitting and predicting on images in our dataset. 
-    This is really about enforcing semantics to ensure we can trivially 
-    run cross-validation and hyperparameter search over the implementing 
-    models with e.g. sklearn. 
-    """
-    columns = ['source', 'file', 'label']
-
-    def fit(self, X, y=None):
-        """
-        Fit our estimator to some images. Note we may want to 
-        pass this model into a grid search and repeatedly fit on subsets
-        to identify optimal hyperparameters, so we need to handle
-        reloading the training data here every time the method is called
-        """
-        raise NotImplementedError("Missing implementation for fit()!")
-
-    def predict(self, X) -> np.ndarray: 
-        """
-        Make a prediction on a single image
-        """
-        raise NotImplementedError("Missing implementation for predict()!")
-
-class NaiveEstimator(ShapeRxEstimator): 
+class NaiveEstimator(BaseEstimator): 
 
     def __init__(self, bins=256):
         """
@@ -110,13 +87,23 @@ class NaiveEstimator(ShapeRxEstimator):
         """
         return np.mean(self.predict(X) == y)
 
+def load_dataset(annotations, image_dir): 
+    """
+    Load and return a compatible dataset for the naive classifier
+    """
+    X = []
+    y = list(annotations.label)
+
+    for index, row in annotations.iterrows(): 
+        file = image_dir + "/" + row.file
+        X.append(image_dataset.load_image(file))
+
+    return X, y
 
 def eval(X): 
     """
     Evaluate the model on a test set
     """
-
-
     pass 
 
 def save_model(model:NaiveEstimator, path):
@@ -127,7 +114,9 @@ def save_model(model:NaiveEstimator, path):
     with open(filename, 'wb') as f: 
         pickle.dump(model, f)
     
-    print(f"Model saved to {path}")
+    print (f"Model saved to {path}")
+
+    return filename
 
 def load_model(path): 
     """

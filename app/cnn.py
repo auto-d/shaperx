@@ -12,6 +12,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torchvision.transforms as transforms
+import mesh_dataset
+import image_dataset
 
 class Net(nn.Module):
     """
@@ -19,13 +21,20 @@ class Net(nn.Module):
     https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
     """
 
+    @classmethod
+    def filter_size(w, f, p=0, s=1):
+        """
+        Helper to sanity check filter output dimensions at runtime
+        output_size = [ (W - F + 2P) / S ] + 1
+        """
+        return ((w - f + 2 * p) / s ) + 1
+
     def __init__(self):
         super().__init__()
-                
-        # Input channels, output channels, kernel height/width
-        self.conv1 = nn.Conv2d(3, 6, 5) 
-        self.pool = nn.MaxPool2d(2, 2)         
-        self.conv2 = nn.Conv2d(6, 16, 5)
+
+        self.conv1 = nn.Conv2d(in_channels=3, out_channels=6, kernel_size=5) 
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.conv2 = nn.Conv2d(in_channels=6, out_channels=16, kernel_size=5)
         self.fc1 = nn.Linear(16 * 5 * 5, 120) 
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, len(class_map))
@@ -37,8 +46,8 @@ class Net(nn.Module):
         # learn a useful pattern in the input. The filter count used is based on 
         # the pytorch example, but if we had the compute we would want to do a 
         # search over these values (as with most other network parameters here)!
-        #
-        # input:       3 x 32^2 
+
+        # in:  3 x 32^2
         # conv @ 6, 5: 6 x 28^2
         # pool @ 2x2:  6 x 14^2
         x = self.conv1(x)
@@ -49,6 +58,8 @@ class Net(nn.Module):
         # input:       6 x 14^2 
         # conv @ 16,5: 16 x 10^2
         # pool @ 2x2:  16 x 5^2
+
+        # out_dims = 14 - 5 + 1 = 10
         x = self.conv2(x)
         x = F.relu(x)
         x = self.pool(x)
@@ -163,21 +174,30 @@ def train(loader, model, iterations=2):
             running_loss += loss.item()
 
             print(f"[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}")
-    
-    return "Training complete!"
 
-def eval(): 
+def eval(loader, model): 
     """
     Evaluate the model on a test set
     """
-    pass 
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    model = model.to(device) 
+    for i, data in enumerate(loader, 0): 
+        inputs, labels = data
+        inputs.to(device)
+        outputs = model(inputs) 
+
+        #TODO: compare outputs to expect results (labels) 
 
 def save_model(model, path):
     """
     Save the model to a file
     """
-    torch.save(model, os.path.join(path, "cnn.pt"))
-    print(f"Model saved to {path}")
+    filename = os.path.join(path, "cnn.pt")
+    torch.save(model, filename)
+    print(f"Model saved to {filename}")
+
+    return filename
 
 def load_model(path): 
     model = torch.load(os.path.join(path, "cnn.pt"))

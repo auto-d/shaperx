@@ -4,13 +4,15 @@ import os
 import pandas as pd
 import numpy as np
 import re 
-import dataset
+import mesh_dataset
+import image_dataset
 import torch
 import torchvision 
 import torchvision.transforms as transforms
 import cnn 
 import svm
 import naive 
+from sklearn.metrics import classification_report, accuracy_score
 
 # Import/export location for 3d models
 data_dir = 'data'
@@ -33,7 +35,7 @@ images_tst = None
 images_val = None 
 
 # Count of classes in the dataset
-classes = len(dataset.class_map)
+classes = len(mesh_dataset.class_map)
 
 # Our models
 naive_model = None 
@@ -110,7 +112,7 @@ def load_metadata():
     Scan the data directory for all available 3d mesh sources (of vertebrae)
     """
     global metadata
-    metadata = dataset.load_mesh_metadata(data_dir)
+    metadata = mesh_dataset.load_mesh_metadata(data_dir)
     groups = metadata.groupby(by='label')
     df = groups.size().reset_index()
     df.columns = ['labels', 'count']
@@ -127,7 +129,7 @@ def sample_metadata(trn_n, tst_n, val_n):
     global mesh_val
     
     if isinstance(metadata, pd.DataFrame):
-        mesh_trn, mesh_tst, mesh_val = dataset.split_meshes(
+        mesh_trn, mesh_tst, mesh_val = mesh_dataset.split_meshes(
             metadata, 
             trn_n, 
             tst_n, 
@@ -180,13 +182,13 @@ def generate_image_set(size_pixels, angle_increment):
     path = get_experiment_dir()
 
     # Generate imagesets for each split
-    images_trn, examples = dataset.generate_image_set(mesh_trn, data_dir, path, size_pixels, angle_increment)
-    images_tst, _ = dataset.generate_image_set(mesh_tst, data_dir, path, size_pixels, angle_increment)
-    images_val, _ = dataset.generate_image_set(mesh_val, data_dir, path, size_pixels, angle_increment)
+    images_trn, examples = mesh_dataset.generate_image_set(mesh_trn, data_dir, path, size_pixels, angle_increment)
+    images_tst, _ = mesh_dataset.generate_image_set(mesh_tst, data_dir, path, size_pixels, angle_increment)
+    images_val, _ = mesh_dataset.generate_image_set(mesh_val, data_dir, path, size_pixels, angle_increment)
 
-    dataset.save_image_set(images_trn, get_trn_csv())
-    dataset.save_image_set(images_tst, get_tst_csv())
-    dataset.save_image_set(images_val, get_val_csv())
+    mesh_dataset.save_image_set(images_trn, get_trn_csv())
+    mesh_dataset.save_image_set(images_tst, get_tst_csv())
+    mesh_dataset.save_image_set(images_val, get_val_csv())
 
     return examples
 
@@ -198,9 +200,9 @@ def load_image_sets():
     global images_tst
     global images_val 
 
-    images_trn = dataset.load_image_set(get_trn_csv())
-    images_tst = dataset.load_image_set(get_tst_csv())
-    images_val = dataset.load_image_set(get_val_csv())
+    images_trn = mesh_dataset.load_image_set(get_trn_csv())
+    images_tst = mesh_dataset.load_image_set(get_tst_csv())
+    images_val = mesh_dataset.load_image_set(get_val_csv())
 
 def train_naive_model(): 
     """
@@ -211,17 +213,14 @@ def train_naive_model():
 
     load_image_sets() 
 
-    X = []
-    y = list(images_trn.label)
-
-    for index, row in images_trn.iterrows(): 
-        file = get_experiment_dir() + "/" + row.file
-        X.append(dataset.load_image(file))
+    X, y = naive.load_dataset(images_trn, get_experiment_dir())
     
     naive_model = naive.NaiveEstimator()
     naive_model.fit(X, y) 
 
-    naive.save_model(naive_model, get_experiment_dir())
+    path = naive.save_model(naive_model, get_experiment_dir())
+
+    return f"Fit model on {len(X)} images. Model written to {path}."
 
 def train_svm_model(): 
     """
@@ -232,35 +231,15 @@ def train_svm_model():
 
     load_image_sets() 
 
-    # TODO: validate this loads and trains
+    X, y = svm.load_dataset(images_trn, get_experiment_dir())
 
-    experiment_dir = get_experiment_dir()
-    categories = sorted([d for d in os.listdir(experiment_dir) 
-                        if os.path.isdir(os.path.join(experiment_dir, d))])
-    print("Categories found:", categories)
+    svm_model = svm.SvmEstimator()
+    svm_model.fit((X, y))
 
-    X, y, filenames = svm_model.load_dataset(experiment_dir, categories)
-    print(f"Dataset loaded with {len(X)} samples")
-    print(f"Feature vector length: {X[0].shape[0]}")
-    print(f"Number of classes: {len(categories)}")
+    path = svm.save_model(svm_model, get_experiment_dir())
 
-    # Find classes with too small samples 
-    unique_classes, class_counts = np.unique(y, return_counts=True)
-    for cls, count in zip(unique_classes, class_counts):
-        print(f"Class {categories[cls]}: {count} samples")
-    invalid_classes = [categories[cls] for cls, count in zip(unique_classes, class_counts) if count < 2]
-    if invalid_classes:
-        raise ValueError(f"Classes with insufficient samples: {invalid_classes}")
-        
-    svm_model, scaler = svm_model.train_validate_model(
-        data_dir=experiment_dir,
-        categories=categories,
-        test_size=0.1,
-        random_state=0,
-    )
-
-    svm.save_model(svm_model, get_experiment_dir())
-6
+    return f"Fit model on {len(X)} images. Model written to {path}."
+    
 def train_cnn_model(): 
     """
     Train a vanilla CNN to classify using the training set
@@ -270,16 +249,15 @@ def train_cnn_model():
     
     load_image_sets() 
 
-    # Create the CNN
     cnn_model = cnn.Net() 
 
-    # Instantiate the pytorch loader with our custom DataSet
     loader = cnn.get_data_loader(get_trn_csv(), get_experiment_dir(), batch_size=2) 
-    
-    # Train 
-    result = cnn.train(loader=loader, model=cnn_model)
 
-    cnn.save_model(cnn_model, get_experiment_dir())
+    cnn.train(loader=loader, model=cnn_model)
+
+    path = cnn.save_model(cnn_model, get_experiment_dir())
+
+    return f"Fit CNN on {len(loader.dataset)}. Model written to {path}."
 
 def classify_naive(model, imageset): 
     """
@@ -291,7 +269,7 @@ def classify_naive(model, imageset):
     y = []
     for index, row in imageset.iterrows(): 
         file = get_experiment_dir() + "/" + row.file
-        X.append(dataset.load_image(file))
+        X.append(image_dataset.load_image(file))
         y.append(row.label)
 
     preds = model.predict(X)
@@ -320,6 +298,16 @@ def classify_cnn(model, imageset):
     #predictions = cnn.eval(loader, cnn_model))
     
     #return prediction
+
+
+def score(y_true, y):
+    
+    accuracy = accuracy_score(y_true, y)
+    print(f"Validation accuracy: {accuracy:.4f}")
+    print("\nClassification Report:")
+    print(classification_report(y_true, y, target_names=categories))
+    
+    return model, scaler
 
 def evaluate(): 
     """
@@ -446,16 +434,13 @@ def main():
         with gr.Group():            
             with gr.Row(): 
                 train_naive_button = gr.Button("Train Naive")
-                gr.Markdown(value="Result:")
-                train_naive_result = gr.Markdown()
+                train_naive_result = gr.Markdown(value="Waiting to train...")
             with gr.Row(): 
                 train_svm_button = gr.Button("Train SVM")                
-                gr.Markdown(value="Result:")
-                train_svm_result = gr.Markdown()
+                train_svm_result = gr.Markdown(value="Waiting to train...")
             with gr.Row(): 
                 train_cnn_button = gr.Button("Train CNN")                
-                gr.Markdown(value="Result:")
-                train_cnn_result = gr.Markdown()
+                train_cnn_result = gr.Markdown(value="Waiting to train...")
 
             train_naive_button.click(fn=train_naive_model, inputs=None, outputs=train_naive_result)
             train_svm_button.click(fn=train_svm_model, inputs=None, outputs=train_svm_result)
