@@ -60,13 +60,10 @@ class NaiveEstimator(ShapeRxEstimator):
         # Tally pixels in each bin for every class, keeping track of the 
         # number of class instances we see
         for image, label in zip(X,y):  
-            hist = self.histogram(image, bins=self.bins) 
+            hist = self.histogram(image) 
 
-            pixel_counters[label] = pixel_counters[label] + hist.flatten()
+            pixel_counters[label] = pixel_counters[label] + hist
             class_counters[label] += 1
-            
-            #TODO: remove after testing
-            break 
 
         # Compute mean 
         for label in labels: 
@@ -75,7 +72,7 @@ class NaiveEstimator(ShapeRxEstimator):
 
         # Sklearn expects us to store learned params with a trailing underscore
         self.labels_ = labels
-        self.histograms_ = pixel_counters
+        self.histograms_ = pixel_counters.astype(np.float32)
 
         return self
 
@@ -105,18 +102,21 @@ class NaiveEstimator(ShapeRxEstimator):
         With help from openCV docs: https://docs.opencv.org/4.x/d1/db7/tutorial_py_histogram_begins.html
         """
         hist = cv2.calcHist(images=[image], channels=[0], mask=None, histSize=[self.bins], ranges=[0,256])
-        return hist
+        return hist.flatten()
     
     def score(self, X, y):
         """
         Sklearn expectation for CV scoring 
         """
         return np.mean(self.predict(X) == y)
-    
-def eval(): 
+
+
+def eval(X): 
     """
     Evaluate the model on a test set
     """
+
+
     pass 
 
 def save_model(model:NaiveEstimator, path):
@@ -136,7 +136,7 @@ def load_model(path):
     model = None
 
     filename = os.path.join(path, 'naive.pkl')
-    with open(filename, 'r') as f: 
+    with open(filename, 'rb') as f: 
         model = pickle.load(f) 
     
     if type(model) != NaiveEstimator: 

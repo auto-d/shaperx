@@ -10,9 +10,7 @@ import torchvision
 import torchvision.transforms as transforms
 import cnn 
 import svm
-
-## Disclaimer: the use of globals here is mildly annoying, but passing all 
-## this state around in gradio isn't super elegant, so we opt to suffer these
+import naive 
 
 # Import/export location for 3d models
 data_dir = 'data'
@@ -38,9 +36,9 @@ images_val = None
 classes = len(dataset.class_map)
 
 # Our models
-naive = None 
-svm = None
-net = None
+naive_model = None 
+svm_model = None
+cnn_model = None
 
 def setup_app_dirs(): 
     """
@@ -192,12 +190,10 @@ def generate_image_set(size_pixels, angle_increment):
 
     return examples
 
-#TODO: ensure this is called if no images have been generated (the typical case) before attempting 
-#training or prediction 
-def load_image_set(): 
+def load_image_sets(): 
     """
-    Retrieve saved image metadata off disk for our three splits
-    """`
+    Retrieve saved image metadata off disk for our three splits if needed
+    """
     global images_trn 
     global images_tst
     global images_val 
@@ -211,33 +207,39 @@ def train_naive_model():
     Prepare a histogram classifier 
     """
     global images_trn
-    global naive
+    global naive_model
 
-    #TODO: pull the image size from the filename, we need it to program the element
+    load_image_sets() 
+
     X = []
-    y = images_trn.label.unique()
+    y = list(images_trn.label)
 
     for index, row in images_trn.iterrows(): 
         file = get_experiment_dir() + "/" + row.file
         X.append(dataset.load_image(file))
     
-    naive = naive.NaiveEstimator()
-    naive.fit(X, y)
+    naive_model = naive.NaiveEstimator()
+    naive_model.fit(X, y) 
+
+    naive.save_model(naive_model, get_experiment_dir())
 
 def train_svm_model(): 
     """
     Train a vanilla CNN to classify using the training set
     """
-    global svm
-    
+    global images_trn
+    global svm_model
+
+    load_image_sets() 
+
     # TODO: validate this loads and trains
 
-    data_dir = get_experiment_dir()
-    categories = sorted([d for d in os.listdir(data_dir) 
-                        if os.path.isdir(os.path.join(data_dir, d))])
+    experiment_dir = get_experiment_dir()
+    categories = sorted([d for d in os.listdir(experiment_dir) 
+                        if os.path.isdir(os.path.join(experiment_dir, d))])
     print("Categories found:", categories)
 
-    X, y, filenames = svm.load_dataset(data_dir, categories)
+    X, y, filenames = svm_model.load_dataset(experiment_dir, categories)
     print(f"Dataset loaded with {len(X)} samples")
     print(f"Feature vector length: {X[0].shape[0]}")
     print(f"Number of classes: {len(categories)}")
@@ -250,68 +252,107 @@ def train_svm_model():
     if invalid_classes:
         raise ValueError(f"Classes with insufficient samples: {invalid_classes}")
         
-    svm, scaler = svm.train_validate_model(
-        data_dir=data_dir,
+    svm_model, scaler = svm_model.train_validate_model(
+        data_dir=experiment_dir,
         categories=categories,
         test_size=0.1,
         random_state=0,
     )
 
+    svm.save_model(svm_model, get_experiment_dir())
+6
 def train_cnn_model(): 
     """
     Train a vanilla CNN to classify using the training set
     """
-    global net 
+    global images_trn
+    global cnn_model 
     
+    load_image_sets() 
+
     # Create the CNN
-    net = cnn.Net() 
+    cnn_model = cnn.Net() 
 
     # Instantiate the pytorch loader with our custom DataSet
     loader = cnn.get_data_loader(get_trn_csv(), get_experiment_dir(), batch_size=2) 
     
     # Train 
-    result = cnn.train(loader=loader, model=net)
+    result = cnn.train(loader=loader, model=cnn_model)
 
-    return result
+    cnn.save_model(cnn_model, get_experiment_dir())
 
-def classify_naive(image): 
+def classify_naive(model, imageset): 
     """
     Classify an image with our naive model
     """
-    global naive
+    global naive_model
     
-    prediction = None 
+    X = []
+    y = []
+    for index, row in imageset.iterrows(): 
+        file = get_experiment_dir() + "/" + row.file
+        X.append(dataset.load_image(file))
+        y.append(row.label)
 
-    # TODO: implement
+    preds = model.predict(X)
     
-    return prediction
+    return preds
 
-def classify_svm(image): 
+def classify_svm(model, imageset): 
     """
     Classify an image with our classical ML model 
     """
-    global svm
+    global svm_model
     
     prediction = None 
-    
+    #predictions = svm.eval(svm_mode, images_val)
     # TODO: implement
     
-    return prediction
+    #return prediction
 
-def classify_cnn(image): 
+def classify_cnn(model, imageset): 
     """
     Classify an image with our neural network 
     """
-    global net
+    global cnn_model
     
-    # TODO: we need to pass the class label back here, not the logits
-    prediction = net(image)
+    #loader = cnn.get_data_loader(imageset, get_experiment_dir(), batch_size=1)
+    #predictions = cnn.eval(loader, cnn_model))
     
-    return prediction
+    #return prediction
+
+def evaluate(): 
+    """
+    Run the validatation data through the models and report a winner
+    """
+    global naive_model 
+    global svm_model 
+    global cnn_model 
+    global images_val
+
+    load_image_sets() 
+
+    # Naive
+    naive_model = naive.load_model(get_experiment_dir())
+    preds = classify_naive(naive_model, images_val)
+    #TODO: compare predictions to actuals (y) to get accuracy, top-k or whatever
+
+    svm_model = svm.load_model(get_experiment_dir())
+    preds = classify_svm(svm_model, images_val)
+
+    cnn_model = cnn.load_model(get_experiment_dir()) 
+    preds = classify_cnn(cnn_model, images_val)
+
+    #TODO: compare
 
 def main(): 
     global experiment_no
     setup_app_dirs() 
+
+    #TODO: hard-coded for testing, remove
+    # 25 - small dataset for testing
+    # 22 - large dataset for training 
+    change_experiment(25)
 
     demo = gr.Blocks()
     with demo: 
@@ -404,26 +445,30 @@ def main():
         gr.Markdown(value="## ⚙️ Train")
         with gr.Group():            
             with gr.Row(): 
-                with gr.Row(): 
-                    train_naive_button = gr.Button("Prepare Naive")
-                    gr.Markdown(value="Preparation result:")
-                    train_naive_result = gr.Markdown()
-                with gr.Row(): 
-                    train_svm_button = gr.Button("Train SVM")                
-                    gr.Markdown(value="Training result:")
-                    train_svm_result = gr.Markdown()
-                with gr.Row(): 
-                    train_cnn_button = gr.Button("Train CNN")                
-                    gr.Markdown(value="Training result:")
-                    train_cnn_result = gr.Markdown()
+                train_naive_button = gr.Button("Train Naive")
+                gr.Markdown(value="Result:")
+                train_naive_result = gr.Markdown()
+            with gr.Row(): 
+                train_svm_button = gr.Button("Train SVM")                
+                gr.Markdown(value="Result:")
+                train_svm_result = gr.Markdown()
+            with gr.Row(): 
+                train_cnn_button = gr.Button("Train CNN")                
+                gr.Markdown(value="Result:")
+                train_cnn_result = gr.Markdown()
 
             train_naive_button.click(fn=train_naive_model, inputs=None, outputs=train_naive_result)
             train_svm_button.click(fn=train_svm_model, inputs=None, outputs=train_svm_result)
             train_cnn_button.click(fn=train_cnn_model, inputs=None, outputs=train_cnn_result)
 
         # Model Testing
-        # TODO: run test set through model and compute various values... 
-        # plot metrics at each epoch with gd.LinePlot
+        gr.Markdown(value="## 🧪 Test")
+        with gr.Group():            
+            evaluate_button = gr.Button("Evaluate")
+            
+        evaluate_button.click(fn=evaluate, inputs=None, outputs=None)
+            # plot metrics at each epoch 
+            #gr.LinePlot()
 
     demo.launch(share=False)
 

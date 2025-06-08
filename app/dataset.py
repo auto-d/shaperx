@@ -148,6 +148,16 @@ def save_image_mask(mesh, h, w, png):
     vis.capture_screen_image(png,do_render=True)    
     vis.destroy_window()
 
+def encode_metadata(id, label, size, x, y, z): 
+    return f"{id}-{label}-{size}-{x}-{y}-{z}"
+
+def decode_metadata(s): 
+    param = s.split(sep="-")
+    if len(param) != 6: 
+        raise ValueError("Unexpected number of metadata fields!")
+    
+    return param[0], param[1], int(param[2]), int(param[3]), int(param[4]), int(param[5])
+
 def generate_image_set(samples, input_path, output_path, size, angle_increment): 
     """
     Generate an image set for one of our splits
@@ -181,7 +191,7 @@ def generate_image_set(samples, input_path, output_path, size, angle_increment):
 
                     # Write, taking care to distinguish the full path for examples
                     # and the path-free file name destined for pytorch
-                    image_file = f"{id}-{label}-{size}-{x}-{y}-{z}.png"
+                    image_file = f"{encode_metadata(id,label,size,x,y,z)}.png"
                     image_path = os.path.join(output_path,image_file)
 
                     renderer.write(image_path)
@@ -215,7 +225,7 @@ def save_image_set(metadata, path):
     annotations = metadata.drop(labels='source', axis='columns')
     annotations.to_csv(path, index=False)
 
-def load_image(self, image_path) -> np.ndarray: 
+def load_image(image_path) -> np.ndarray: 
     """
     Load an image and return a grayscale image
     """
@@ -226,13 +236,12 @@ def load_image(self, image_path) -> np.ndarray:
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     return gray 
     
-def load_image_set(self, path) -> np.ndarray: 
+def load_image_set(path) -> np.ndarray: 
     """
     Load an image set off disk from the provided path
     """
     annotations = pd.read_csv(path)
-
-
+    return annotations
 
 import vtk 
 class Renderer(): 
