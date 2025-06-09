@@ -100,12 +100,6 @@ def load_dataset(annotations, image_dir):
 
     return X, y
 
-def eval(X): 
-    """
-    Evaluate the model on a test set
-    """
-    pass 
-
 def save_model(model:NaiveEstimator, path):
     """
     Save the model to a file

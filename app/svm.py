@@ -55,12 +55,6 @@ def load_dataset(annotations, image_dir):
 
     return X, y
 
-def eval(): 
-    """
-    Evaluate the model on a test set
-    """
-    pass 
-
 def save_model(model:SvmEstimator, path):
     """
     Save the model to a file

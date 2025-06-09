@@ -282,11 +282,11 @@ def classify_svm(model, imageset):
 
     return preds
 
-def classify_cnn(model, imageset): 
+def classify_cnn(model, imageset_path): 
     """
     Classify an image with our neural network 
     """
-    loader = cnn.get_data_loader(imageset, get_experiment_dir(), batch_size=1, shuffle=False)
+    loader = cnn.get_data_loader(imageset_path, get_experiment_dir(), batch_size=1, shuffle=False)
     preds = cnn.predict(loader, model)
     
     return preds
@@ -329,7 +329,7 @@ def evaluate():
     result += score(y, svm_preds)
 
     cnn_model = cnn.load_model(get_experiment_dir()) 
-    cnn_preds = classify_cnn(cnn_model, images_val)
+    cnn_preds = classify_cnn(cnn_model, get_val_csv())
     result += score(y, cnn_preds)
 
     return result

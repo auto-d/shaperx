@@ -250,21 +250,13 @@ def predict(loader, model):
         # Compute the logits for every class and grab the class
         # TODO: switch this to top-k? 
         for i, data in enumerate(loader): 
-            inputs, labels = data
-            inputs.to(device)
+            inputs, _ = data
+            inputs = inputs.to(device)
             outputs = model(inputs) 
             
             preds.append(outputs.index[max(outputs)])
 
     return preds
-
-def eval(loader, model): 
-    """
-    Evaluate the model on a test set
-    """
-    #TODO: compare outputs to expect results (labels) ?
-    
-    pass    
 
 def save_model(model, path):
     """
