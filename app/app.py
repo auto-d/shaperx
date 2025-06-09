@@ -249,15 +249,18 @@ def train_cnn_model():
     
     load_image_sets() 
 
-    cnn_model = cnn.Net() 
-
+    # Retrieve the image height/width
     loader = cnn.get_data_loader(get_trn_csv(), get_experiment_dir(), batch_size=1) 
+    shape = loader.dataset[0][0].shape 
+    width = shape[2]
+
+    cnn_model = cnn.Net(width) 
 
     loss_history = cnn.train(loader=loader, model=cnn_model, loss_interval=20, epochs=10, lr=0.002, momentum=0.1)
 
     path = cnn.save_model(cnn_model, get_experiment_dir())
 
-    return f"Fit CNN on {len(loader.dataset)}. Model written to {path}."
+    return f"Fit CNN on {len(loader.dataset)} images. Model written to {path}."
 
 def classify_naive(model, imageset): 
     """
@@ -292,8 +295,8 @@ def score(y_true, y):
     """
     Generically score a set of predictions against provided ground-truth
     """
-    labels = mesh_dataset.class_map.values() 
-    label_names = mesh_dataset.class_map.keys() 
+    labels = list(mesh_dataset.class_map.values())
+    label_names = list(mesh_dataset.class_map.keys())
 
     result = "" 
     accuracy = accuracy_score(y_true, y)
@@ -315,18 +318,19 @@ def evaluate():
 
     load_image_sets() 
 
-    # Naive
+    y = images_val.label.to_numpy()
+
     naive_model = naive.load_model(get_experiment_dir())
     naive_preds = classify_naive(naive_model, images_val)
-    result = score(naive_preds, images_val.label)
+    result = score(y, naive_preds)
     
     svm_model = svm.load_model(get_experiment_dir())
     svm_preds = classify_svm(svm_model, images_val)
-    result += score(naive_preds, images_val.label)
+    result += score(y, naive_preds)
 
     cnn_model = cnn.load_model(get_experiment_dir()) 
     cnn_preds = classify_cnn(cnn_model, images_val)
-    result += score(naive_preds, images_val.label)
+    result += score(y, naive_preds)
 
     return result
 
@@ -432,19 +436,17 @@ def main():
         with gr.Group():            
             with gr.Row(): 
                 train_naive_button = gr.Button("Train Naive")
-                train_naive_result = gr.Markdown(value="Waiting to train...")
+                train_naive_result = gr.Markdown()
             with gr.Row(): 
                 train_svm_button = gr.Button("Train SVM")                
-                train_svm_result = gr.Markdown(value="Waiting to train...")
+                train_svm_result = gr.Markdown()
             with gr.Row(): 
                 train_cnn_button = gr.Button("Train CNN")                
-                train_cnn_result = gr.Markdown(value="Waiting to train...")
+                train_cnn_result = gr.Markdown()
 
             train_naive_button.click(fn=train_naive_model, inputs=None, outputs=train_naive_result)
             train_svm_button.click(fn=train_svm_model, inputs=None, outputs=train_svm_result)
-            train_cnn_button.click(fn=train_cnn_model, inputs=None, outputs=train_cnn_result, loss_plot)
-
-        gr.LinePlot()
+            train_cnn_button.click(fn=train_cnn_model, inputs=None, outputs=train_cnn_result)
 
         # Model Validation 
         gr.Markdown(value="## 🧪 Test")
