@@ -147,6 +147,89 @@ def save_image_mask(mesh, h, w, png):
     vis.capture_screen_image(png,do_render=True)    
     vis.destroy_window()
 
+def encode_metadata(id, label, size, x, y, z): 
+    return f"{id}-{label}-{size}-{x}-{y}-{z}"
+
+def decode_metadata(s): 
+    param = s.split(sep="-")
+    if len(param) != 6: 
+        raise ValueError("Unexpected number of metadata fields!")
+    
+    return param[0], param[1], int(param[2]), int(param[3]), int(param[4]), int(param[5])
+
+def generate_image_set(samples, input_path, output_path, size, angle_increment): 
+    """
+    Generate an image set for one of our splits
+    """
+    
+    if not os.path.exists(output_path): 
+        os.makedirs(output_path) 
+
+    metadata = pd.DataFrame(columns=['source', 'file', 'label'])
+    insert_at = 0
+    examples = []
+
+    renderer = Renderer(size)
+
+    # Iterate over the samples we selected from the dataset
+    for row in samples.itertuples(): 
+        id = row[0]
+        file = row[1]
+        label = row[2]
+        
+        renderer.load(os.path.join(input_path,file))
+
+        # Iterate over the camera angles implied by the angle step/stride
+        
+        X = range(0, 360, angle_increment)
+        Y = range(0, 360, angle_increment)
+        Z = range(0, 360, angle_increment)
+        for x in X: 
+            for y in Y: 
+                for z in Z: 
+
+                    # Write, taking care to distinguish the full path for examples
+                    # and the path-free file name destined for pytorch
+                    image_file = f"{encode_metadata(id,label,size,x,y,z)}.png"
+                    image_path = os.path.join(output_path,image_file)
+
+                    renderer.write(image_path)
+                    print(f"Image written to {image_path}")
+                    
+                    metadata.loc[insert_at] = { 
+                        'source': file, 
+                        'file' : image_file, 
+                        'label': get_class_index(label)
+                        }
+                    insert_at += 1
+                        
+                    if len(examples) < 20: 
+                        examples.append(image_path)
+                    
+                    # Apply *relative* rotation 
+                    renderer.rotate(0,0,angle_increment)                
+                # <- Don't screw up the indentation here
+                renderer.rotate(0,angle_increment,0)            
+            # <- ...or here 
+            renderer.rotate(angle_increment,0,0)
+
+    return metadata, examples
+
+def save_image_set(metadata, path): 
+    """
+    Write an image set to disk at the provided location 
+    """    
+    # Our dataframe has some extra information that needs to be ejected before we 
+    # create the pytorch-esqe annotations file.
+    annotations = metadata.drop(labels='source', axis='columns')
+    annotations.to_csv(path, index=False)
+   
+def load_image_set(path) -> np.ndarray: 
+    """
+    Load an image set off disk from the provided path
+    """
+    annotations = pd.read_csv(path)
+    return annotations
 
 import vtk 
 class Renderer(): 
@@ -221,7 +304,11 @@ class Renderer():
             self.actor.RotateX(x)
             self.actor.RotateY(y)
             self.actor.RotateZ(z)
-            #self.actor.Modified()
+            self.actor.Modified()
+
+            # This is essential, as we move we need the camera is 
+            # centered
+            self.renderer.ResetCamera()
             self.render_window.Render() 
 
     def write(self, path): 

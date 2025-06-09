@@ -4,15 +4,15 @@ import os
 import pandas as pd
 import numpy as np
 import re 
-import dataset
+import mesh_dataset
+import image_dataset
 import torch
 import torchvision 
 import torchvision.transforms as transforms
 import cnn 
 import svm
-
-## Disclaimer: the use of globals here is mildly annoying, but passing all 
-## this state around in gradio isn't super elegant, so we opt to suffer these
+import naive 
+from sklearn.metrics import classification_report, accuracy_score, top_k_accuracy_score
 
 # Import/export location for 3d models
 data_dir = 'data'
@@ -35,12 +35,12 @@ images_tst = None
 images_val = None 
 
 # Count of classes in the dataset
-classes = len(dataset.class_map)
+classes = len(mesh_dataset.class_map)
 
 # Our models
-naive = None 
-svm = None
-net = None
+naive_model = None 
+svm_model = None
+cnn_model = None
 
 def setup_app_dirs(): 
     """
@@ -112,7 +112,7 @@ def load_metadata():
     Scan the data directory for all available 3d mesh sources (of vertebrae)
     """
     global metadata
-    metadata = dataset.load_mesh_metadata(data_dir)
+    metadata = mesh_dataset.load_mesh_metadata(data_dir)
     groups = metadata.groupby(by='label')
     df = groups.size().reset_index()
     df.columns = ['labels', 'count']
@@ -129,7 +129,7 @@ def sample_metadata(trn_n, tst_n, val_n):
     global mesh_val
     
     if isinstance(metadata, pd.DataFrame):
-        mesh_trn, mesh_tst, mesh_val = dataset.split_meshes(
+        mesh_trn, mesh_tst, mesh_val = mesh_dataset.split_meshes(
             metadata, 
             trn_n, 
             tst_n, 
@@ -162,64 +162,6 @@ def compute_image_count(angle_increment):
             + mesh_val.shape[0]* viewpoints_per_axis**3 
         return f"{int(count)}"
 
-def generate_split_images(samples, path, size, angle_increment): 
-    """
-    Generate an image set for one of our splits
-    """
-    
-    if not os.path.exists(path): 
-        os.makedirs(path) 
-
-    images = pd.DataFrame(columns=['source', 'file', 'label'])
-    insert_at = 0
-    examples = []
-
-    renderer = dataset.Renderer(size)
-
-    # Iterate over the samples we selected from the dataset
-    for row in samples.itertuples(): 
-        id = row[0]
-        file = row[1]
-        label = row[2]
-        
-        renderer.load(os.path.join(data_dir,file))
-
-        # Iterate over the camera angles implied by the angle step/stride
-        
-        X = range(0, 360, angle_increment)
-        Y = range(0, 360, angle_increment)
-        Z = range(0, 360, angle_increment)
-        for x in X: 
-            for y in Y: 
-                for z in Z: 
-
-                    # Write, taking care to distinguish the full path for examples
-                    # and the path-free file name destined for pytorch
-                    image_file = f"{id}-{label}-{size}-{x}-{y}-{z}.png"
-                    image_path = os.path.join(path,image_file)
-
-                    renderer.write(image_path)
-                    print(f"Image written to {image_path}")
-                    
-                    images.loc[insert_at] = { 
-                        'source': file, 
-                        'file' : image_file, 
-                        'label': dataset.get_class_index(label)
-                        }
-                    insert_at += 1
-                        
-                    if len(examples) < 20: 
-                        examples.append(image_path)
-                    
-                    # Apply *relative* rotation 
-                    renderer.rotate(0,0,angle_increment)                
-                # <- Don't screw up the indentation here
-                renderer.rotate(0,angle_increment,0)            
-            # <- ...or here 
-            renderer.rotate(angle_increment,0,0)
-
-    return images, examples
-
 def get_trn_csv(): 
     return os.path.join(get_experiment_dir(),'train.csv')
 
@@ -229,7 +171,7 @@ def get_tst_csv():
 def get_val_csv(): 
     return os.path.join(get_experiment_dir(),'val.csv')
 
-def generate_images(size_pixels, angle_increment):
+def generate_image_set(size_pixels, angle_increment):
     """
     Use our 3d models to permute and emit images for each split
     """
@@ -240,118 +182,174 @@ def generate_images(size_pixels, angle_increment):
     path = get_experiment_dir()
 
     # Generate imagesets for each split
-    images_trn, examples = generate_split_images(mesh_trn, path, size_pixels, angle_increment)
-    images_tst, _ = generate_split_images(mesh_tst, path, size_pixels, angle_increment)
-    images_val, _ = generate_split_images(mesh_val, path, size_pixels, angle_increment)
+    images_trn, examples = mesh_dataset.generate_image_set(mesh_trn, data_dir, path, size_pixels, angle_increment)
+    images_tst, _ = mesh_dataset.generate_image_set(mesh_tst, data_dir, path, size_pixels, angle_increment)
+    images_val, _ = mesh_dataset.generate_image_set(mesh_val, data_dir, path, size_pixels, angle_increment)
 
-    # Our dataframe has some extra information that needs to be ejected before we 
-    # create the pytorch-esqe annotations file. This memorializes the splits and permits us to 
-    # pick up later with these labelsets.
-    annotations = images_trn.drop(labels='source', axis='columns')
-    annotations.to_csv(get_trn_csv(), index=False)
-    annotations = images_tst.drop(labels='source', axis='columns')
-    annotations.to_csv(get_tst_csv(), index=False)
-    annotations = images_val.drop(labels='source', axis='columns')
-    annotations.to_csv(get_val_csv(), index=False)
+    mesh_dataset.save_image_set(images_trn, get_trn_csv())
+    mesh_dataset.save_image_set(images_tst, get_tst_csv())
+    mesh_dataset.save_image_set(images_val, get_val_csv())
 
     return examples
 
-def prepare_naive_model(): 
+def load_image_sets(): 
+    """
+    Retrieve saved image metadata off disk for our three splits if needed
+    """
+    global images_trn 
+    global images_tst
+    global images_val 
+
+    images_trn = mesh_dataset.load_image_set(get_trn_csv())
+    images_tst = mesh_dataset.load_image_set(get_tst_csv())
+    images_val = mesh_dataset.load_image_set(get_val_csv())
+
+def train_naive_model(): 
     """
     Prepare a histogram classifier 
     """
-    global naive
+    global images_trn
+    global naive_model
+
+    load_image_sets() 
+
+    X, y = naive.load_dataset(images_trn, get_experiment_dir())
     
-    # TODO - build average histograms for all training samples
+    naive_model = naive.NaiveEstimator()
+    naive_model.fit(X, y) 
+
+    path = naive.save_model(naive_model, get_experiment_dir())
+
+    return f"Fit model on {len(X)} images. Model written to {path}."
 
 def train_svm_model(): 
     """
     Train a vanilla CNN to classify using the training set
     """
-    global svm
+    global images_trn
+    global svm_model
+
+    load_image_sets() 
+
+    X, y = svm.load_dataset(images_trn, get_experiment_dir())
+
+    svm_model = svm.SvmEstimator()
+    svm_model.fit(X, y)
+
+    path = svm.save_model(svm_model, get_experiment_dir())
+
+    return f"Fit model on {len(X)} images. Model written to {path}."
     
-    # TODO: validate this loads and trains
-
-    data_dir = get_experiment_dir()
-    categories = sorted([d for d in os.listdir(data_dir) 
-                        if os.path.isdir(os.path.join(data_dir, d))])
-    print("Categories found:", categories)
-
-    X, y, filenames = svm.load_dataset(data_dir, categories)
-    print(f"Dataset loaded with {len(X)} samples")
-    print(f"Feature vector length: {X[0].shape[0]}")
-    print(f"Number of classes: {len(categories)}")
-
-    # Find classes with too small samples 
-    unique_classes, class_counts = np.unique(y, return_counts=True)
-    for cls, count in zip(unique_classes, class_counts):
-        print(f"Class {categories[cls]}: {count} samples")
-    invalid_classes = [categories[cls] for cls, count in zip(unique_classes, class_counts) if count < 2]
-    if invalid_classes:
-        raise ValueError(f"Classes with insufficient samples: {invalid_classes}")
-        
-    svm, scaler = svm.train_validate_model(
-        data_dir=data_dir,
-        categories=categories,
-        test_size=0.1,
-        random_state=0,
-    )
-
 def train_cnn_model(): 
     """
     Train a vanilla CNN to classify using the training set
     """
-    global net 
+    global images_trn
+    global cnn_model 
     
-    # Create the CNN
-    net = cnn.Net() 
+    load_image_sets() 
 
-    # Instantiate the pytorch loader with our custom DataSet
-    loader = cnn.get_data_loader(get_trn_csv(), get_experiment_dir(), batch_size=2) 
-    
-    # Train 
-    result = cnn.train(loader=loader, model=net)
+    # Retrieve the image height/width
+    loader = cnn.get_data_loader(get_trn_csv(), get_experiment_dir(), batch_size=1) 
+    shape = loader.dataset[0][0].shape 
+    width = shape[2]
 
-    return result
+    cnn_model = cnn.Net(width) 
 
-def classify_naive(image): 
+    loss_history = cnn.train(loader=loader, model=cnn_model, loss_interval=20, epochs=10, lr=0.002, momentum=0.1)
+
+    path = cnn.save_model(cnn_model, get_experiment_dir())
+
+    return f"Fit CNN on {len(loader.dataset)} images. Model written to {path}."
+
+def classify_naive(model, imageset): 
     """
-    Classify an image with our naive model
-    """
-    global naive
-    
-    prediction = None 
+    Classify an imageset with our naive model
+    """   
+    X, _ = naive.load_dataset(imageset, get_experiment_dir())
 
-    # TODO: implement
+    preds = model.predict(X)
     
-    return prediction
+    return preds
 
-def classify_svm(image): 
+def classify_svm(model, imageset): 
     """
     Classify an image with our classical ML model 
-    """
-    global svm
-    
-    prediction = None 
-    
-    # TODO: implement
-    
-    return prediction
+    """   
+    X, _ = svm.load_dataset(imageset, get_experiment_dir())
 
-def classify_cnn(image): 
+    preds = model.predict(X) 
+    probas = model.predict_probas(X)
+
+    return preds, probas
+
+def classify_cnn(model, imageset_path): 
     """
     Classify an image with our neural network 
     """
-    global net
+    loader = cnn.get_data_loader(imageset_path, get_experiment_dir(), batch_size=1, shuffle=False)
+    preds, probas = cnn.predict(loader, model)
     
-    # TODO: we need to pass the class label back here, not the logits
-    prediction = net(image)
+    return preds, probas
+
+def score(y_true, y, y_probas=None):
+    """
+    Generically score a set of predictions against provided ground-truth
+    """
+    labels = list(mesh_dataset.class_map.values())
+    label_names = list(mesh_dataset.class_map.keys())
+
+    result = "" 
+    accuracy = accuracy_score(y_true, y)
     
-    return prediction
+    result += f"Validation accuracy: {accuracy:.2f}\n"
+    result += "\nClassification Report:\n"
+    result += classification_report(y_true, y, labels=labels, target_names=label_names)
+
+    if type(y_probas) == np.ndarray or type(y_probas) == list: 
+        result += f"top K accuracy: {top_k_accuracy_score(y_true, y_probas):.2f}"
+    
+    return result
+
+def evaluate(): 
+    """
+    Run the validation data through the models and report a winner
+    """
+    global naive_model 
+    global svm_model 
+    global cnn_model 
+    global images_val
+
+    load_image_sets() 
+
+    y = images_val.label.to_numpy()
+
+    naive_model = naive.load_model(get_experiment_dir())
+    naive_preds = classify_naive(naive_model, images_val)
+    result = "======================\nNaive model (histogram-based distance measure):\n"
+    result += score(y, naive_preds)
+    
+    svm_model = svm.load_model(get_experiment_dir())
+    svm_preds, svm_probas = classify_svm(svm_model, images_val)
+    result += "\n\n======================\nSVM classifier:\n"
+    result += score(y, svm_preds, svm_probas)
+
+    cnn_model = cnn.load_model(get_experiment_dir()) 
+    cnn_preds, cnn_probas = classify_cnn(cnn_model, get_val_csv())
+    result += "\n\n======================\nCNN-based classifier:\n"
+    result += score(y, cnn_preds, cnn_probas)
+
+    return result
 
 def main(): 
     global experiment_no
     setup_app_dirs() 
+
+    #TODO: hard-coded for testing, remove
+    # 82 - small dataset for testing @32 pixels
+    # 25 - small dataset for testing  @256
+    # 21 - large dataset for training @256
+    change_experiment(82)
 
     demo = gr.Blocks()
     with demo: 
@@ -438,34 +436,34 @@ def main():
             image_gallery_label = gr.Markdown(value="Training set examples:")
             image_gallery = gr.Gallery()
 
-            image_generate_button.click(fn=generate_images, inputs=[image_size, image_angle], outputs=image_gallery)
+            image_generate_button.click(fn=generate_image_set, inputs=[image_size, image_angle], outputs=image_gallery)
         
         # Model Training 
         gr.Markdown(value="## ⚙️ Train")
         with gr.Group():            
             with gr.Row(): 
-                 with gr.Row(): 
-                    train_naive_button = gr.Button("Prepare Naive")
-                    gr.Markdown(value="Preparation result:")
-                    train_naive_result = gr.Markdown()
-                with gr.Row(): 
-                    train_svm_button = gr.Button("Train SVM")                
-                    gr.Markdown(value="Training result:")
-                    train_svm_result = gr.Markdown()
-                with gr.Row(): 
-                    train_cnn_button = gr.Button("Train CNN")                
-                    gr.Markdown(value="Training result:")
-                    train_cnn_result = gr.Markdown()
+                train_naive_button = gr.Button("Train Naive")
+                train_naive_result = gr.Textbox(show_label=False)
+            with gr.Row(): 
+                train_svm_button = gr.Button("Train SVM")                
+                train_svm_result = gr.Textbox(show_label=False)
+            with gr.Row(): 
+                train_cnn_button = gr.Button("Train CNN")                
+                train_cnn_result = gr.Textbox(show_label=False)
 
-            train_naive_button.click(fn=prepare_naive_model, inputs=None, outputs=train_naive_result)
+            train_naive_button.click(fn=train_naive_model, inputs=None, outputs=train_naive_result)
             train_svm_button.click(fn=train_svm_model, inputs=None, outputs=train_svm_result)
             train_cnn_button.click(fn=train_cnn_model, inputs=None, outputs=train_cnn_result)
 
-        # Model Testing
-        # TODO: run test set through model and compute various values... 
-        # plot metrics at each epoch with gd.LinePlot
+        # Model Validation 
+        gr.Markdown(value="## 🧪 Test")
+        with gr.Group():            
+            evaluate_button = gr.Button("Evaluate")
+            evaluate_result = gr.Textbox(value="Waiting for evaluation...", label="Results:")
 
-    demo.launch(share=False)
+        evaluate_button.click(fn=evaluate, inputs=None, outputs=evaluate_result)
+
+    demo.launch(share=True)
 
 if __name__ == "__main__":
     main()
