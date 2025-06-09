@@ -278,7 +278,7 @@ def classify_svm(model, imageset):
     """   
     X, _ = svm.load_dataset(imageset, get_experiment_dir())
 
-    preds = svm.predict(X) 
+    preds = model.predict(X) 
 
     return preds
 
@@ -326,11 +326,11 @@ def evaluate():
     
     svm_model = svm.load_model(get_experiment_dir())
     svm_preds = classify_svm(svm_model, images_val)
-    result += score(y, naive_preds)
+    result += score(y, svm_preds)
 
     cnn_model = cnn.load_model(get_experiment_dir()) 
     cnn_preds = classify_cnn(cnn_model, images_val)
-    result += score(y, naive_preds)
+    result += score(y, cnn_preds)
 
     return result
 
