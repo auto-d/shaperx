@@ -277,6 +277,6 @@ def save_model(model, path):
     return filename
 
 def load_model(path): 
-    model = torch.load(os.path.join(path, "cnn.pt"))
+    model = torch.load(os.path.join(path, "cnn.pt"), weights_only=False)
 
     return model
