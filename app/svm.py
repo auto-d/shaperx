@@ -79,7 +79,7 @@ def load_model(path) -> SvmEstimator:
     model = None
 
     filename = os.path.join(path, 'svm.pkl')
-    with open(filename, 'r') as f: 
+    with open(filename, 'rb') as f: 
         model = pickle.load(f) 
     
     if type(model) != SVC: 
