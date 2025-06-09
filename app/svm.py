@@ -82,7 +82,7 @@ def load_model(path) -> SvmEstimator:
     with open(filename, 'rb') as f: 
         model = pickle.load(f) 
     
-    if type(model) != SVC: 
+    if type(model) != SvmEstimator: 
         raise ValueError(f"Unexpected type {type(model)} found in {filename}")
 
     return model
