@@ -4,6 +4,7 @@
 
 from torchsummary import summary
 import os
+import math 
 import pandas as pd
 import torch
 import torchvision 
@@ -20,16 +21,17 @@ class Net(nn.Module):
     """
 
     @classmethod
-    def filter_size(w, f, p=0, s=1):
+    def filter_size(cls, w, f, p=0, s=1):
         """
         Helper to sanity check filter output dimensions at runtime
         output_size = [ (W - F + 2P) / S ] + 1
         """
         return ((w - f + 2 * p) / s ) + 1
 
-    def __init__(self):
+    def __init__(self, w=32):
         super().__init__()
         
+        self.dyn_convs = nn.ModuleList(self.build_scaling_layers(w))
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=6, kernel_size=5) 
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.conv2 = nn.Conv2d(in_channels=6, out_channels=16, kernel_size=5)
@@ -37,7 +39,40 @@ class Net(nn.Module):
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, len(class_map))
 
+    def build_scaling_layers(self, w): 
+        """
+        Build scaling layers to handle input size dynamically
+        """
+        convs = []
+        
+        # There are only a handful of resolutions we allow at the moment, but this logic
+        # will scale to arbitrary 32x2^x widths. Anyway, here are the iterations this 
+        # loop produces for our supported image sizes
+        # 32 -> 0 scale adjustments:
+        # 64 -> 1 scale adjustments to:
+        #  32.0
+        # 128 -> 2 scale adjustments to:
+        #  -64.0
+        #  -32.0
+        # 256 -> 3 scale adjustments to 
+        #  -128.0
+        #  -64.0
+        #  -32.0
+        scale = math.log2(w/32)
+        if scale.is_integer(): 
+            for i in range(int(scale)):
+                print(f"Creating dynamic filter for scaling @ {scale} ({w} pixel width)...")
+                convs.append(nn.Conv2d(in_channels=3,out_channels=3,kernel_size=8,stride=2, padding=3))
+                w = Net.filter_size(w=w,f=8,s=2,p=3)
+            
+        return convs
+
     def forward(self, x):
+        # 0. Convolution shim to learn features only relevant at larger image scales
+        for conv in self.dyn_convs: 
+            x = conv(x)
+            x = F.relu(x)
+
         # 1. Convolution + pooling
         #
         # Each filter here (conv_2d out_channels) is a unique opportunity to 
@@ -138,12 +173,12 @@ def train(loader, model, loss_interval=20, epochs=2, lr=0.01, momentum=0.9):
     """
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
-    loss_history = []
+    train_loss = []
 
     model.train()
     model = model.to(device)
     
-    loss_fn = nn.CrossEntropyLoss() 
+    loss_fn = nn.CrossEntropyLoss()
 
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
 
@@ -156,7 +191,7 @@ def train(loader, model, loss_interval=20, epochs=2, lr=0.01, momentum=0.9):
             inputs, labels = data
             inputs = inputs.to(device)
             labels = labels.to(device)
-
+            
             # zero the parameter gradients
             optimizer.zero_grad()
 
@@ -167,15 +202,35 @@ def train(loader, model, loss_interval=20, epochs=2, lr=0.01, momentum=0.9):
             loss.backward()
             optimizer.step()
 
-            # print statistics
+            # collect metrics
             running_loss += loss.item()
 
             if (i % loss_interval) == (loss_interval - 1): 
-                loss_history.append(running_loss / loss_interval)
+                train_loss.append(running_loss / loss_interval)
                 print(f"[{epoch + 1}, {i + 1:5d}] loss: {running_loss / loss_interval:.3f}")
                 running_loss = 0 
 
-    return loss_history 
+    return train_loss 
+
+from skorch import NeuralNetClassifier
+from skorch.helper import SkorchDoctor
+
+def train_debug(loader, y, epochs, lr, momentum): 
+
+    net = NeuralNetClassifier(
+        module=Net, 
+        criterion=nn.CrossEntropyLoss, 
+        optimizer=optim.SGD, 
+        max_epochs=epochs, 
+        lr=lr, 
+        optimizer__momentum=momentum, 
+        verbose=0)
+    
+    dr = SkorchDoctor(net) 
+
+    dr.fit(loader.dataset, y=y)
+
+    return dr
 
 def predict(loader, model): 
     """
