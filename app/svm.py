@@ -15,7 +15,7 @@ class SvmEstimator(BaseEstimator):
         """
         self.labels_ = None
         self.scaler_ = StandardScaler()
-        self.model_ = SVC()
+        self.model_ = SVC(probability=True)
     
     def fit(self, X, y=None): 
         """
@@ -33,6 +33,13 @@ class SvmEstimator(BaseEstimator):
         """
         X_scaled = self.scaler_.transform(X)        
         return self.model_.predict(X_scaled)
+
+    def predict_probas(self, X) -> np.ndarray: 
+        """
+        Predict classes for a set of inputs (images) based on a prior fit
+        """
+        X_scaled = self.scaler_.transform(X)        
+        return self.model_.predict_proba(X_scaled)
     
     def score(self, X, y):
         """

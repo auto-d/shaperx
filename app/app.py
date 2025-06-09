@@ -12,7 +12,7 @@ import torchvision.transforms as transforms
 import cnn 
 import svm
 import naive 
-from sklearn.metrics import classification_report, accuracy_score
+from sklearn.metrics import classification_report, accuracy_score, top_k_accuracy_score
 
 # Import/export location for 3d models
 data_dir = 'data'
@@ -279,19 +279,20 @@ def classify_svm(model, imageset):
     X, _ = svm.load_dataset(imageset, get_experiment_dir())
 
     preds = model.predict(X) 
+    probas = model.predict_probas(X)
 
-    return preds
+    return preds, probas
 
 def classify_cnn(model, imageset_path): 
     """
     Classify an image with our neural network 
     """
     loader = cnn.get_data_loader(imageset_path, get_experiment_dir(), batch_size=1, shuffle=False)
-    preds = cnn.predict(loader, model)
+    preds, probas = cnn.predict(loader, model)
     
-    return preds
+    return preds, probas
 
-def score(y_true, y):
+def score(y_true, y, y_probas=None):
     """
     Generically score a set of predictions against provided ground-truth
     """
@@ -301,9 +302,12 @@ def score(y_true, y):
     result = "" 
     accuracy = accuracy_score(y_true, y)
     
-    result += f"Validation accuracy: {accuracy:.4f}"
-    result += "\nClassification Report:"
+    result += f"Validation accuracy: {accuracy:.2f}\n"
+    result += "\nClassification Report:\n"
     result += classification_report(y_true, y, labels=labels, target_names=label_names)
+
+    if type(y_probas) == np.ndarray or type(y_probas) == list: 
+        result += f"top K accuracy: {top_k_accuracy_score(y_true, y_probas):.2f}"
     
     return result
 
@@ -322,15 +326,18 @@ def evaluate():
 
     naive_model = naive.load_model(get_experiment_dir())
     naive_preds = classify_naive(naive_model, images_val)
-    result = score(y, naive_preds)
+    result = "======================\nNaive model (histogram-based distance measure):\n"
+    result += score(y, naive_preds)
     
     svm_model = svm.load_model(get_experiment_dir())
-    svm_preds = classify_svm(svm_model, images_val)
-    result += score(y, svm_preds)
+    svm_preds, svm_probas = classify_svm(svm_model, images_val)
+    result += "\n\n======================\nSVM classifier:\n"
+    result += score(y, svm_preds, svm_probas)
 
     cnn_model = cnn.load_model(get_experiment_dir()) 
-    cnn_preds = classify_cnn(cnn_model, get_val_csv())
-    result += score(y, cnn_preds)
+    cnn_preds, cnn_probas = classify_cnn(cnn_model, get_val_csv())
+    result += "\n\n======================\nCNN-based classifier:\n"
+    result += score(y, cnn_preds, cnn_probas)
 
     return result
 
@@ -436,13 +443,13 @@ def main():
         with gr.Group():            
             with gr.Row(): 
                 train_naive_button = gr.Button("Train Naive")
-                train_naive_result = gr.Markdown()
+                train_naive_result = gr.Textbox(show_label=False)
             with gr.Row(): 
                 train_svm_button = gr.Button("Train SVM")                
-                train_svm_result = gr.Markdown()
+                train_svm_result = gr.Textbox(show_label=False)
             with gr.Row(): 
                 train_cnn_button = gr.Button("Train CNN")                
-                train_cnn_result = gr.Markdown()
+                train_cnn_result = gr.Textbox(show_label=False)
 
             train_naive_button.click(fn=train_naive_model, inputs=None, outputs=train_naive_result)
             train_svm_button.click(fn=train_svm_model, inputs=None, outputs=train_svm_result)
@@ -452,11 +459,11 @@ def main():
         gr.Markdown(value="## 🧪 Test")
         with gr.Group():            
             evaluate_button = gr.Button("Evaluate")
-            evaluate_result = gr.Markdown(value="Waiting for evaluation...")
+            evaluate_result = gr.Textbox(value="Waiting for evaluation...", label="Results:")
 
         evaluate_button.click(fn=evaluate, inputs=None, outputs=evaluate_result)
 
-    demo.launch(share=False)
+    demo.launch(share=True)
 
 if __name__ == "__main__":
     main()

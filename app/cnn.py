@@ -238,6 +238,7 @@ def predict(loader, model):
     """
 
     preds = []
+    probas = []
 
     # Reduce the memory required for a forward pass by disabling the 
     # automatic gradient computation (i.e. commit to not call backward()
@@ -253,10 +254,12 @@ def predict(loader, model):
             inputs, _ = data
             inputs = inputs.to(device)
             outputs = model(inputs) 
-            
-            preds.append(outputs.index[max(outputs)])
 
-    return preds
+            predictions = outputs.to("cpu").flatten()
+            preds.append(torch.argmax(predictions))
+            probas.append(predictions)
+
+    return preds, probas
 
 def save_model(model, path):
     """
