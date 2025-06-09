@@ -14,7 +14,7 @@ class SvmEstimator(BaseEstimator):
         Initialize an instance of our classifier
         """
         self.labels_ = None
-        self.scaler = StandardScaler()
+        self.scaler_ = StandardScaler()
         self.model_ = SVC()
     
     def fit(self, X, y=None): 
@@ -49,7 +49,9 @@ def load_dataset(annotations, image_dir):
 
     for index, row in annotations.iterrows(): 
         file = image_dir + "/" + row.file
-        X.append(image_dataset.load_image(file))
+        image = image_dataset.load_image(file)
+        
+        X.append(image.flatten())
 
     return X, y
 

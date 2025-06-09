@@ -234,7 +234,7 @@ def train_svm_model():
     X, y = svm.load_dataset(images_trn, get_experiment_dir())
 
     svm_model = svm.SvmEstimator()
-    svm_model.fit((X, y))
+    svm_model.fit(X, y)
 
     path = svm.save_model(svm_model, get_experiment_dir())
 
@@ -251,9 +251,9 @@ def train_cnn_model():
 
     cnn_model = cnn.Net() 
 
-    loader = cnn.get_data_loader(get_trn_csv(), get_experiment_dir(), batch_size=2) 
+    loader = cnn.get_data_loader(get_trn_csv(), get_experiment_dir(), batch_size=1) 
 
-    cnn.train(loader=loader, model=cnn_model)
+    loss_history = cnn.train(loader=loader, model=cnn_model, loss_interval=20, epochs=10, lr=0.002, momentum=0.1)
 
     path = cnn.save_model(cnn_model, get_experiment_dir())
 
@@ -261,16 +261,9 @@ def train_cnn_model():
 
 def classify_naive(model, imageset): 
     """
-    Classify an image with our naive model
-    """
-    global naive_model
-    
-    X = []
-    y = []
-    for index, row in imageset.iterrows(): 
-        file = get_experiment_dir() + "/" + row.file
-        X.append(image_dataset.load_image(file))
-        y.append(row.label)
+    Classify an imageset with our naive model
+    """   
+    X, _ = naive.load_dataset(imageset, get_experiment_dir())
 
     preds = model.predict(X)
     
@@ -279,39 +272,41 @@ def classify_naive(model, imageset):
 def classify_svm(model, imageset): 
     """
     Classify an image with our classical ML model 
-    """
-    global svm_model
-    
-    prediction = None 
-    #predictions = svm.eval(svm_mode, images_val)
-    # TODO: implement
-    
-    #return prediction
+    """   
+    X, _ = svm.load_dataset(imageset, get_experiment_dir())
+
+    preds = svm.predict(X) 
+
+    return preds
 
 def classify_cnn(model, imageset): 
     """
     Classify an image with our neural network 
     """
-    global cnn_model
+    loader = cnn.get_data_loader(imageset, get_experiment_dir(), batch_size=1, shuffle=False)
+    preds = cnn.predict(loader, model)
     
-    #loader = cnn.get_data_loader(imageset, get_experiment_dir(), batch_size=1)
-    #predictions = cnn.eval(loader, cnn_model))
-    
-    #return prediction
-
+    return preds
 
 def score(y_true, y):
-    
+    """
+    Generically score a set of predictions against provided ground-truth
+    """
+    labels = mesh_dataset.class_map.values() 
+    label_names = mesh_dataset.class_map.keys() 
+
+    result = "" 
     accuracy = accuracy_score(y_true, y)
-    print(f"Validation accuracy: {accuracy:.4f}")
-    print("\nClassification Report:")
-    print(classification_report(y_true, y, target_names=categories))
     
-    return model, scaler
+    result += f"Validation accuracy: {accuracy:.4f}"
+    result += "\nClassification Report:"
+    result += classification_report(y_true, y, labels=labels, target_names=label_names)
+    
+    return result
 
 def evaluate(): 
     """
-    Run the validatation data through the models and report a winner
+    Run the validation data through the models and report a winner
     """
     global naive_model 
     global svm_model 
@@ -322,25 +317,28 @@ def evaluate():
 
     # Naive
     naive_model = naive.load_model(get_experiment_dir())
-    preds = classify_naive(naive_model, images_val)
-    #TODO: compare predictions to actuals (y) to get accuracy, top-k or whatever
-
+    naive_preds = classify_naive(naive_model, images_val)
+    result = score(naive_preds, images_val.label)
+    
     svm_model = svm.load_model(get_experiment_dir())
-    preds = classify_svm(svm_model, images_val)
+    svm_preds = classify_svm(svm_model, images_val)
+    result += score(naive_preds, images_val.label)
 
     cnn_model = cnn.load_model(get_experiment_dir()) 
-    preds = classify_cnn(cnn_model, images_val)
+    cnn_preds = classify_cnn(cnn_model, images_val)
+    result += score(naive_preds, images_val.label)
 
-    #TODO: compare
+    return result
 
 def main(): 
     global experiment_no
     setup_app_dirs() 
 
     #TODO: hard-coded for testing, remove
-    # 25 - small dataset for testing
-    # 22 - large dataset for training 
-    change_experiment(25)
+    # 82 - small dataset for testing @32 pixels
+    # 25 - small dataset for testing  @256
+    # 21 - large dataset for training @256
+    change_experiment(82)
 
     demo = gr.Blocks()
     with demo: 
@@ -444,16 +442,17 @@ def main():
 
             train_naive_button.click(fn=train_naive_model, inputs=None, outputs=train_naive_result)
             train_svm_button.click(fn=train_svm_model, inputs=None, outputs=train_svm_result)
-            train_cnn_button.click(fn=train_cnn_model, inputs=None, outputs=train_cnn_result)
+            train_cnn_button.click(fn=train_cnn_model, inputs=None, outputs=train_cnn_result, loss_plot)
 
-        # Model Testing
+        gr.LinePlot()
+
+        # Model Validation 
         gr.Markdown(value="## 🧪 Test")
         with gr.Group():            
             evaluate_button = gr.Button("Evaluate")
-            
-        evaluate_button.click(fn=evaluate, inputs=None, outputs=None)
-            # plot metrics at each epoch 
-            #gr.LinePlot()
+            evaluate_result = gr.Markdown(value="Waiting for evaluation...")
+
+        evaluate_button.click(fn=evaluate, inputs=None, outputs=evaluate_result)
 
     demo.launch(share=False)
 

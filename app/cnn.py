@@ -2,8 +2,7 @@
 # Adapated from PyTorch image classifier tutorial - https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
 #
 
-from dataset import class_map
-
+from torchsummary import summary
 import os
 import pandas as pd
 import torch
@@ -12,8 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torchvision.transforms as transforms
-import mesh_dataset
-import image_dataset
+from mesh_dataset import class_map
 
 class Net(nn.Module):
     """
@@ -31,7 +29,7 @@ class Net(nn.Module):
 
     def __init__(self):
         super().__init__()
-
+        
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=6, kernel_size=5) 
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         self.conv2 = nn.Conv2d(in_channels=6, out_channels=16, kernel_size=5)
@@ -119,7 +117,7 @@ class ShapeRxDataset(torch.utils.data.Dataset):
             label = self.target_transform(label) 
         return image, label 
     
-def get_data_loader(annotations_file, img_dir, batch_size=5): 
+def get_data_loader(annotations_file, img_dir, batch_size=5, shuffle=True): 
     """
     Retrieve a pytorch-style dataloader 
     """
@@ -130,32 +128,34 @@ def get_data_loader(annotations_file, img_dir, batch_size=5):
     ])
 
     data = ShapeRxDataset(annotations_file, img_dir, transform=transform)
-    loader = torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=True)
+    loader = torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=shuffle)
     
     return loader
 
-def train(loader, model, iterations=2):
+def train(loader, model, loss_interval=20, epochs=2, lr=0.01, momentum=0.9):
     """
     Train the model with the provided dataset
     """
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
+    loss_history = []
+
     model.train()
     model = model.to(device)
     
     loss_fn = nn.CrossEntropyLoss() 
 
-    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
 
-    for epoch in range(iterations):  # loop over the dataset multiple times
+    for epoch in range(epochs):
 
         running_loss = 0.0
-        for i, data in enumerate(loader, 0):
+        for i, data in enumerate(loader):
 
             # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
-            inputs.to(device)
-            labels.to(device)
+            inputs = inputs.to(device)
+            labels = labels.to(device)
 
             # zero the parameter gradients
             optimizer.zero_grad()
@@ -163,9 +163,6 @@ def train(loader, model, iterations=2):
             # forward + backward + optimize
             outputs = model(inputs)
 
-            # TODO: something about our loss calculation or labels is busted ... we are starting
-            # with a really low loss that monotically increases. fine if the network is getting 
-            # worse than random guesses, but it shouldn't start out at a low loss reliably
             loss = loss_fn(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -173,21 +170,46 @@ def train(loader, model, iterations=2):
             # print statistics
             running_loss += loss.item()
 
-            print(f"[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}")
+            if (i % loss_interval) == (loss_interval - 1): 
+                loss_history.append(running_loss / loss_interval)
+                print(f"[{epoch + 1}, {i + 1:5d}] loss: {running_loss / loss_interval:.3f}")
+                running_loss = 0 
+
+    return loss_history 
+
+def predict(loader, model): 
+    """
+    Run a dataset through the (hopefully trained) model and return outputs
+    """
+
+    preds = []
+
+    # Reduce the memory required for a forward pass by disabling the 
+    # automatic gradient computation (i.e. commit to not call backward()
+    # after this pass)
+    with torch.no_grad(): 
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = model.to(device) 
+        model.eval() 
+
+        # Compute the logits for every class and grab the class
+        # TODO: switch this to top-k? 
+        for i, data in enumerate(loader): 
+            inputs, labels = data
+            inputs.to(device)
+            outputs = model(inputs) 
+            
+            preds.append(outputs.index[max(outputs)])
+
+    return preds
 
 def eval(loader, model): 
     """
     Evaluate the model on a test set
     """
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    model = model.to(device) 
-    for i, data in enumerate(loader, 0): 
-        inputs, labels = data
-        inputs.to(device)
-        outputs = model(inputs) 
-
-        #TODO: compare outputs to expect results (labels) 
+    #TODO: compare outputs to expect results (labels) ?
+    
+    pass    
 
 def save_model(model, path):
     """
