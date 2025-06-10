@@ -12,7 +12,7 @@ import torchvision.transforms as transforms
 import cnn 
 import svm
 import naive 
-from sklearn.metrics import classification_report, accuracy_score, top_k_accuracy_score
+from sklearn.metrics import classification_report, accuracy_score, top_k_accuracy_score, confusion_matrix, ConfusionMatrixDisplay
 
 # Import/export location for 3d models
 data_dir = 'data'
@@ -311,6 +311,15 @@ def score(y_true, y, y_probas=None):
     
     return result
 
+def get_cm_plot(y, preds): 
+    """
+    Generate a confusion matrix for the provided true and predicted value lists
+    """
+    cm = confusion_matrix(y, preds)
+    cmd = ConfusionMatrixDisplay(cm)
+    cmd.plot()
+    return cmd.figure_
+
 def evaluate(): 
     """
     Run the validation data through the models and report a winner
@@ -326,20 +335,23 @@ def evaluate():
 
     naive_model = naive.load_model(get_experiment_dir())
     naive_preds = classify_naive(naive_model, images_val)
-    result = "======================\nNaive model (histogram-based distance measure):\n"
-    result += score(y, naive_preds)
+    naive_result = "Naive model (histogram-based distance measure):\n"
+    naive_result += score(y, naive_preds)
+    naive_cm_figure = get_cm_plot(y, naive_preds)
     
     svm_model = svm.load_model(get_experiment_dir())
     svm_preds, svm_probas = classify_svm(svm_model, images_val)
-    result += "\n\n======================\nSVM classifier:\n"
-    result += score(y, svm_preds, svm_probas)
+    svm_result = "SVM classifier:\n"
+    svm_result += score(y, svm_preds, svm_probas)
+    svm_cm_figure = get_cm_plot(y, svm_preds)
 
     cnn_model = cnn.load_model(get_experiment_dir()) 
     cnn_preds, cnn_probas = classify_cnn(cnn_model, get_val_csv())
-    result += "\n\n======================\nCNN-based classifier:\n"
-    result += score(y, cnn_preds, cnn_probas)
+    cnn_result = "CNN-based classifier:\n"
+    cnn_result += score(y, cnn_preds, cnn_probas)
+    cnn_cm_figure = get_cm_plot(y, cnn_preds)
 
-    return result
+    return naive_result, naive_cm_figure, svm_result, svm_cm_figure, cnn_result, cnn_cm_figure
 
 def main(): 
     global experiment_no
@@ -349,7 +361,8 @@ def main():
     # 82 - small dataset for testing @32 pixels
     # 25 - small dataset for testing  @256
     # 21 - large dataset for training @256
-    change_experiment(82)
+    # 106 - medium dataset for training @64 pixels
+    change_experiment(106)
 
     demo = gr.Blocks()
     with demo: 
@@ -459,11 +472,19 @@ def main():
         gr.Markdown(value="## 🧪 Test")
         with gr.Group():            
             evaluate_button = gr.Button("Evaluate")
-            evaluate_result = gr.Textbox(value="Waiting for evaluation...", label="Results:")
+            with gr.Row(): 
+                naive_result = gr.Textbox(value="Waiting for evaluation...", label="Results:")
+                naive_cm = gr.Plot(label="Naive Confusion Matrix")
+            with gr.Row(): 
+                svm_result = gr.Textbox(value="Waiting for evaluation...", label="Results:")
+                svm_cm = gr.Plot(label="SVM Confusion Matrix")
+            with gr.Row(): 
+                cnn_result = gr.Textbox(value="Waiting for evaluation...", label="Results:")
+                cnn_cm = gr.Plot(label="CNN Confusion Matrix")
 
-        evaluate_button.click(fn=evaluate, inputs=None, outputs=evaluate_result)
+        evaluate_button.click(fn=evaluate, inputs=None, outputs=[naive_result, naive_cm, svm_result, svm_cm, cnn_result, cnn_cm])
 
-    demo.launch(share=True)
+    demo.launch(share=False)
 
 if __name__ == "__main__":
     main()
