@@ -57,10 +57,10 @@ The Gradio app allows the user to walk through the model pipeline, from download
 
 ![alt text](app.png)
 
-### Usage 
+## Usage 
 
 
-### Evaluation
+## Evaluation
 
     # Figure 1 Confusion Matrix - Validation Set - Traditional ML Model
 
@@ -72,11 +72,11 @@ The Gradio app allows the user to walk through the model pipeline, from download
 
 While the precision and recall of individual classes is a useful metric for debugging our classification operation, we assess that the user really cares about overall *accuracy*. That is, the total number of correctly vs incorrectly classifed images. This metric is intuitive and concise in the context of vertebrae classification . 
 
-### Results
+## Results
 
-### Conclusion
+## Conclusion
 
-### Outstanding Issues 
+## Outstanding Issues 
 
 - ❗ a number of files are not loading into the mesh, warning printed is shown below. for now we are ignoring, but we should process the whole dataset to remove these and then resample, otherwise we'll have unintended class imbalance
   > [Open3D WARNING] Unable to load file data/001200_vertebrae.stl with ASSIMP: Unable to open file "data/001200_vertebrae.stl".
