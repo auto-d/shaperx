@@ -10,6 +10,16 @@ This project utilizes the MedShapeNet database to develop and evaluate a machine
 
 Problem Statement: This project aims to develop a model using Medshapenet vertebrae data to classify medical images into a set of pre-defined medical categories, comparing the performance of a naive, non-deep learning model, and a deep learning model (e.g., Convolutional Neural Network). Accurate, unbiased classification is integral in determining diagnosis and pathology, and may be useful in terms of allocating resources and advocating for next-step treatment options.
 
+Previous Literature:
+
+Li, J., et al., "Anatomy Completor: A Multi-class Completion Framework for 3D Anatomy Reconstruction," arXiv:2309.04956 (2023)
+
+- Employs 3D auto-encoders and other deep learning models for mapping and reconstructing anatomical shapes using MedShapeNet database.
+
+MedShapeNet [GitHub](https://github.com/GLARKI/MedShapeNet2.0)
+
+- Project documentation and resources with stated intended uses for classification and reconstruction. ​
+- Dedicated Python API, allowing for integration into ML/AI pipelines. 
 
 **Theme**: Health, wellness and fitness
 
