@@ -224,6 +224,7 @@ def train_debug(loader, y, epochs, lr, momentum):
         max_epochs=epochs, 
         lr=lr, 
         optimizer__momentum=momentum, 
+        module__w=64, 
         verbose=0)
     
     dr = SkorchDoctor(net) 

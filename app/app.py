@@ -256,7 +256,7 @@ def train_cnn_model():
 
     cnn_model = cnn.Net(width) 
 
-    loss_history = cnn.train(loader=loader, model=cnn_model, loss_interval=20, epochs=10, lr=0.002, momentum=0.1)
+    loss_history = cnn.train(loader=loader, model=cnn_model, loss_interval=250, epochs=300, lr=0.0017, momentum=0.5)
 
     path = cnn.save_model(cnn_model, get_experiment_dir())
 
@@ -357,7 +357,7 @@ def main():
     global experiment_no
     setup_app_dirs() 
 
-    #TODO: hard-coded for testing, remove
+    # For deployment, pick an experiment to default to: 
     # 82 - small dataset for testing @32 pixels
     # 25 - small dataset for testing  @256
     # 21 - large dataset for training @256
