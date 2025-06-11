@@ -21,7 +21,21 @@ Problem Statement: This project aims to develop a model using Medshapenet verteb
    
 ### Traditional ML Pipeline (support vector machine)
 
-This dataset contains the following scripts to support the traditional ml pipeline:
+The svm classifier:
+
+- is able to load an image function to take in square images from 32x32 to 500x500 and flattens them into a 1-D array.
+
+- takes in the data directory and associated category labels from subdirectory folders
+& returns a numpy array of the data, labels, and associated filenames
+& added error handling in case the loading fails
+
+- Once data is loaded and properly sorted by category, the pipeline:
+   - 10% set aside for validation    
+   - splits the data 80% training, 20% testing  
+   - standardizes features into the model using StandardScaler
+   - stratifies category labels as best practice to minimize class imbalance while training
+
+- Predicts the class using the trained svm model
 
 ### Deep Learning Pipeline (Convolutional Neural Network)
 
