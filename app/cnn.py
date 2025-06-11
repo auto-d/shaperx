@@ -2,7 +2,6 @@
 # Adapated from PyTorch image classifier tutorial - https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html
 #
 
-from torchsummary import summary
 import os
 import math 
 import pandas as pd
