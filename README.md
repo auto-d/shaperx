@@ -142,13 +142,9 @@ CNN:
 - Runtime: SVM and neural network resisted training efforts for the large (80K images @ 256 x 256)
 ## Outstanding Issues 
 
-- ❗ a number of files are not loading into the mesh, warning printed is shown below. for now we are ignoring, but we should process the whole dataset to remove these and then resample, otherwise we'll have unintended class imbalance
-  > [Open3D WARNING] Unable to load file data/001200_vertebrae.stl with ASSIMP: Unable to open file "data/001200_vertebrae.stl".
-- ❗ we aren't inducing any scale or lighting changes in our images, remedy that! (?)
-- fix NN training, it's not converging 
-- validate SVM training and classification 
-- implement naive method 
-- write a test routine that compares the three for a subset of data
-- add a panel to the UI that overlays the classification on the image or adds a figure subtitle 
+ - Hyper-parameter Search Space: Overall network architecture, kernel sizes, feature map depth, learning rate, momentum, elastic architecture for variable image dimensions create a large search space​
+- Divergent Train/Val Scores: NN-based methods converged, but memorized training data and often resisted improvement on validation sets for tens of examples per class​
+- Per-resolution hyper-parameters: At 32x32 we can converge with LR @ 0.002. But at 128x128 resolution, we will reliably fail unless LR is 0.001 or below.
+## Ethics Statement
 
-- testing - use experiment 25, training for real, use 22 
+This project utilizes the MedShapeNet database to develop and evaluate a machine learning classifier, a naïve approach, a deep learning and non-deep learning model for medical shape classification. All data used in this study are de-identified and publicly available, ensuring the privacy and confidentiality of individuals are protected. MedShapeNet database is distributed under the Creative Commons Attribution 4.0 International (CC BY 4.0) license. 
