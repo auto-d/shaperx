@@ -133,13 +133,13 @@ CNN:
  - Top-K: .30
 
 ## Conclusion
-Image Resolution: Task seems approachable, but low-resolution images don't betray enough detail to add rotation and scale invariance we need, higher-resolution deny training at larger scale NN requires to learn features ​
+ - Image Resolution: Task seems approachable, but low-resolution images don't betray enough detail to add rotation and scale invariance we need, higher-resolution deny training at larger scale NN requires to learn features ​
 
-Neural Network Training: Difficulty is high with so many variables​
+- Neural Network Training: Difficulty is high with so many variables​
 
-Variable Image Size: Using a configurable image size for the corpus and networks introduced unneeded complexity​
+- Variable Image Size: Using a configurable image size for the corpus and networks introduced unneeded complexity​
 
-Runtime: SVM and neural network resisted training efforts for the large (80K images @ 256 x 256)
+- Runtime: SVM and neural network resisted training efforts for the large (80K images @ 256 x 256)
 ## Outstanding Issues 
 
 - ❗ a number of files are not loading into the mesh, warning printed is shown below. for now we are ignoring, but we should process the whole dataset to remove these and then resample, otherwise we'll have unintended class imbalance
