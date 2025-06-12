@@ -76,7 +76,7 @@ Neural-network-based approach :
 
 ### Metric Selection
 
-1) Precision, recall, and F1 score: Investigating performance on a per class basis
+1) Accuracy: Investigating performance on a per class basis
 2) Confusion matrix: Visually assessing performance for each model
 3) Top K: Assessing model improvement over 24 classes. 
 
@@ -97,7 +97,7 @@ The model can be demonstrated by deploying the included gradio application.
 
 1. cd <repo>/app
 2. python app.py 
-3. point browser at http://127.0.0.1:7860
+3. point browser at [https://3c7e4b51043a5486da.gradio.live/]
 
 ### Visual Interface 
 
@@ -122,8 +122,24 @@ While the precision and recall of individual classes is a useful metric for debu
 
 ## Results
 
-## Conclusion
+Naive model: 
+ - Accuracy: .07
+ - Top-K: N/A
+SVM:
+ - Accuracy: .19
+ - Top-K: .31
+CNN:
+ - Accuracy: .21
+ - Top-K: .30
 
+## Conclusion
+Image Resolution: Task seems approachable, but low-resolution images don't betray enough detail to add rotation and scale invariance we need, higher-resolution deny training at larger scale NN requires to learn features ​
+
+Neural Network Training: Difficulty is high with so many variables​
+
+Variable Image Size: Using a configurable image size for the corpus and networks introduced unneeded complexity​
+
+Runtime: SVM and neural network resisted training efforts for the large (80K images @ 256 x 256)
 ## Outstanding Issues 
 
 - ❗ a number of files are not loading into the mesh, warning printed is shown below. for now we are ignoring, but we should process the whole dataset to remove these and then resample, otherwise we'll have unintended class imbalance
