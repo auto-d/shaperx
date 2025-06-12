@@ -106,14 +106,6 @@ The Gradio app allows the user to walk through the model pipeline, from download
 ![alt text](app.png)
 
 
-## Evaluation
-
-    # Figure 1 Confusion Matrix - Validation Set - Traditional ML Model
-
-    # Figure 2 Classification Report - Validation Set - Non - Deep Learning Model
-
-    # Figure 3 Classification Report - Test Set - Deep Learning Model
-
 ### Metric
 
 While the precision and recall of individual classes is a useful metric for debugging our classification operation, we assess that the user really cares about overall *accuracy*. That is, the total number of correctly vs incorrectly classifed images. This metric is intuitive and concise in the context of vertebrae classification . 
