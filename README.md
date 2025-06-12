@@ -30,7 +30,7 @@ MedShapeNet [GitHub](https://github.com/GLARKI/MedShapeNet2.0)
 
 **Theme**: Health, wellness and fitness
 
-## Models & Design
+## Models Selected
 
 ### Naive Classifier
 
@@ -54,7 +54,31 @@ Neural-network-based approach :
 - PyTorch-based convolutional neural network (CNN)
 - 2 to 5 convolutional layers depending on image size
 - Convolution layers transition to fully connected
-     
+
+## Modeling Approach   
+
+### Data Processing Pipeline
+
+- Acquire meshes for all vertebrae
+- Stratify and sample training, validation, and test sets
+- Set meatadata for generation of input images
+- Load into a scene, illuminate, orbit camera, and render
+- Store image for all positions at configurable size
+- Memorialize all metadata for the campaign for each data set
+
+### Model Evaluation Process
+
+ - Ensure class balance trhough stratified sampling
+ - Hold out datasets for validation and test stages
+ - Avoid cross validation due to size of dataset
+ - Prefer top-K and confusion matrix given number of classes
+ - Run each model through same dataset and apply metrics
+
+### Metric Selection
+
+
+
+
 
 ### Development
 
@@ -66,9 +90,6 @@ If working on the UI, run in gradio development mode:
 
 ⚡ The app expects to be run from the root of the repo, not the app directory. Mostly because we have the 'data' directory hardcoded.
 
-### Testing 
-
-TODO
 
 ### Deployment
 
@@ -78,7 +99,7 @@ The model can be demonstrated by deploying the included gradio application.
 2. python app.py 
 3. point browser at http://127.0.0.1:7860
 
-### Interface 
+### Visual Interface 
 
 The Gradio app allows the user to walk through the model pipeline, from downloading 3d models through classification and validation. 
 
