@@ -76,9 +76,9 @@ Neural-network-based approach :
 
 ### Metric Selection
 
-
-
-
+1) Precision, recall, and F1 score: Investigating performance on a per class basis
+2) Confusion matrix: Visually assessing performance for each model
+3) Top K: Assessing model improvement over 24 classes. 
 
 ### Development
 
