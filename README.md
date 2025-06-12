@@ -8,11 +8,16 @@
 
 [Project Presentation](https://prodduke-my.sharepoint.com/personal/jjm126_duke_edu/_layouts/15/stream.aspx?id=%2Fpersonal%2Fjjm126%5Fduke%5Fedu%2FDocuments%2FAIPI%2D540%2Fvision%5Fproject%5Fpresentation%2Emp4&ga=1&referrer=StreamWebApp%2EWeb&referrerScenario=AddressBarCopied%2Eview%2Ed64e213c%2De763%2D4f45%2D86aa%2D97d52f919d93)
 
+## Introduction
 This project utilizes the MedShapeNet database to develop and evaluate a machine learning classifier, a naïve approach, a deep learning and non-deep learning model for medical shape classification. All data used in this study are de-identified and publicly available, ensuring the privacy and confidentiality of individuals are protected. MedShapeNet database is distributed under the Creative Commons Attribution 4.0 International (CC BY 4.0) license. 
 
+## Problem Statement
 Problem Statement: This project aims to develop a model using Medshapenet vertebrae data to classify medical images into a set of pre-defined medical categories, comparing the performance of a naive, non-deep learning model, and a deep learning model (e.g., Convolutional Neural Network). Accurate, unbiased classification is integral in determining diagnosis and pathology, and may be useful in terms of allocating resources and advocating for next-step treatment options.
 
-Previous Literature:
+## Data Source
+[Source](https://arxiv.org/abs/2308.16139)
+
+## Previous Literature
 
 Li, J., et al., "Anatomy Completor: A Multi-class Completion Framework for 3D Anatomy Reconstruction," arXiv:2309.04956 (2023)
 
@@ -25,15 +30,18 @@ MedShapeNet [GitHub](https://github.com/GLARKI/MedShapeNet2.0)
 
 **Theme**: Health, wellness and fitness
 
-## Design
+## Models & Design
 
 ### Naive Classifier
 
-1. Naive approach : B&w histograms?
+Naive approach :
+
+- Histogram baseline of training corpus
+- Chi-Square Distance measure for prediction 
    
 ### Traditional ML Pipeline (support vector machine)
 
-The svm classifier:
+SVM classifier:
 
 - is able to load an image function to take in square images from 32x32 to 500x500 and flattens them into a 1-D array.
 
@@ -51,7 +59,10 @@ The svm classifier:
 
 ### Deep Learning Pipeline (Convolutional Neural Network)
 
-Neural-network-based approach : PyTorch-based convolutional neural network (CNN)
+Neural-network-based approach : 
+
+- PyTorch-based convolutional neural network (CNN)
+- 
      
 svm_model_train.py:
 
