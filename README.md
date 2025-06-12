@@ -4,7 +4,7 @@
 
 [MedshapeNet Reference](https://arxiv.org/abs/2308.16139)
 
-[Hosted Gradio App Location](https://851e2f3ca2ecd38233.gradio.live)
+[Hosted Gradio App Location](https://7c7b056f60a7fed238.gradio.live/)
 
 [Project Presentation](https://prodduke-my.sharepoint.com/personal/jjm126_duke_edu/_layouts/15/stream.aspx?id=%2Fpersonal%2Fjjm126%5Fduke%5Fedu%2FDocuments%2FAIPI%2D540%2Fvision%5Fproject%5Fpresentation%2Emp4&ga=1&referrer=StreamWebApp%2EWeb&referrerScenario=AddressBarCopied%2Eview%2Ed64e213c%2De763%2D4f45%2D86aa%2D97d52f919d93)
 
