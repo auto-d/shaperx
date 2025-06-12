@@ -105,8 +105,6 @@ The Gradio app allows the user to walk through the model pipeline, from download
 
 ![alt text](app.png)
 
-## Usage 
-
 
 ## Evaluation
 
