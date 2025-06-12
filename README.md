@@ -55,7 +55,6 @@ Neural-network-based approach :
 - 2 to 5 convolutional layers depending on image size
 - Convolution layers transition to fully connected
      
-svm_model_train.py:
 
 ### Development
 
