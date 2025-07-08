@@ -1,12 +1,6 @@
-![Duke AIPI Logo](https://storage.googleapis.com/aipi_datasets/Duke-AIPI-Logo.png)
-
-# Shaperx AIPI 540 Project #1
+# ShapeRx
 
 [MedshapeNet Reference](https://arxiv.org/abs/2308.16139)
-
-[Hosted Gradio App Location](https://7c7b056f60a7fed238.gradio.live/)
-
-[Project Presentation](https://prodduke-my.sharepoint.com/personal/jjm126_duke_edu/_layouts/15/stream.aspx?id=%2Fpersonal%2Fjjm126%5Fduke%5Fedu%2FDocuments%2FAIPI%2D540%2Fvision%5Fproject%5Fpresentation%2Emp4&ga=1&referrer=StreamWebApp%2EWeb&referrerScenario=AddressBarCopied%2Eview%2Ed64e213c%2De763%2D4f45%2D86aa%2D97d52f919d93)
 
 ## Introduction
 This project utilizes the MedShapeNet database to develop and evaluate a machine learning classifier, a naïve approach, a deep learning and non-deep learning model for medical shape classification. All data used in this study are de-identified and publicly available, ensuring the privacy and confidentiality of individuals are protected. MedShapeNet database is distributed under the Creative Commons Attribution 4.0 International (CC BY 4.0) license. 
